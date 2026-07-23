@@ -1,0 +1,1596 @@
+=== Thu Jul 23 09:21:32 UTC 2026 -- Procesando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Blackburn Rovers - Nottingham Forest/ ===
+INFO Corriendo core.tracking (hybrid) sobre datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Blackburn Rovers - Nottingham Forest/720p.mp4 ...
+INFO Cargando SoccerMaster desde /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster ...
+FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+Loading weights:   0%|          | 0/400 [00:00<?, ?it/s]Loading weights:  45%|████▌     | 181/400 [00:00<00:00, 555.86it/s]Loading weights: 100%|██████████| 400/400 [00:00<00:00, 1046.20it/s]
+[transformers] [1mSiglipVisionModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                          | Status     |  | 
+-------------------------------------------------------------+------------+--+-
+text_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+text_model.head.weight                                       | UNEXPECTED |  | 
+text_model.final_layer_norm.weight                           | UNEXPECTED |  | 
+text_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+text_model.embeddings.token_embedding.weight                 | UNEXPECTED |  | 
+logit_bias                                                   | UNEXPECTED |  | 
+logit_scale                                                  | UNEXPECTED |  | 
+text_model.final_layer_norm.bias                             | UNEXPECTED |  | 
+text_model.head.bias                                         | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+[transformers] Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49406. This may result in unexpected behavior.
+[transformers] Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49407. This may result in unexpected behavior.
+Loading weights:   0%|          | 0/390 [00:00<?, ?it/s]Loading weights: 100%|██████████| 390/390 [00:00<00:00, 14731.97it/s]
+[transformers] [1mSiglipTextModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                            | Status     |  | 
+---------------------------------------------------------------+------------+--+-
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.weight                    | UNEXPECTED |  | 
+vision_model.head.probe                                        | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_weight                     | UNEXPECTED |  | 
+vision_model.head.layernorm.bias                               | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.bias                                 | UNEXPECTED |  | 
+vision_model.post_layernorm.bias                               | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.bias                   | UNEXPECTED |  | 
+vision_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.bias                      | UNEXPECTED |  | 
+vision_model.head.layernorm.weight                             | UNEXPECTED |  | 
+logit_bias                                                     | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_bias                       | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.weight                               | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.weight                               | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.weight                 | UNEXPECTED |  | 
+logit_scale                                                    | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.bias                                 | UNEXPECTED |  | 
+vision_model.post_layernorm.weight                             | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+INFO SoccerMaster listo: clip=30 frames, input=512x512, device=cuda, fp16=True
+INFO Cargando YOLO yolo11x.pt ...
+FutureWarning: The `ByteTrack` was deprecated since v0.28.0. It will be removed in v0.30.0.
+INFO Procesando datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Blackburn Rovers - Nottingham Forest/720p.mp4 — 1280x720 @ 25.0 fps, 142887 frames (chunk=30, stride=1)
+UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:4381.)
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @7200ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @10160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @67480ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @68080ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @123600ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @163560ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @187160ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @188160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @188840ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @189640ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @223240ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @224160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @225920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @268000ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @283320ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @284960ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @285840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @313960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @354080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @525400ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @526440ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @528560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @554800ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @555520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @576440ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @585880ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @671600ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @686880ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @687640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @695440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @700120ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @701080ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @708760ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @727560ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @747240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @834160ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @856960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @926120ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @990040ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @990880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @991680ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1070960ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1072560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1133480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1134000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1183480ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1199920ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1209760ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1239320ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1240520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1240840ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1379640ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1486960ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1603720ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1605320ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1676280ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1751720ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1823880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @1844080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2000800ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2040160ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2041240ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2041840ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2044240ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2059160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2060400ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2088160ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2090360ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2100760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2119520ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2153920ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2186800ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2299120ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2356000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2546400ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2548480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2638640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2678240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2678880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2702080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2802520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2816640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2868680ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2895920ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2897760ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2936320ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @2937360ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3026720ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3194000ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3328360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3361440ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3411040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3439720ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3494280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3494760ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3614520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3752480ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3759840ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3774280ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3796920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3798400ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3799080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3909120ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3910160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3911920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @3932080ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4001160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4002480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4003840ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4005640ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4006880ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4007640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4287000ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4288560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4304880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4314400ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4314520ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4315800ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4381880ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4476760ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4503160ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4593120ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4666160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4757920ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @4962280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5063760ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5134880ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5135080ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5154800ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5190800ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5200000ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5237080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5384440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5385800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5389240ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5397400ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5416920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5431240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5457840ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5471760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5525120ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5596960ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5599080ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5602880ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5662240ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5664200ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Blackburn Rovers - Nottingham Forest h1 @5676280ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+INFO Positivos extraídos de 2019-10-01 - Blackburn Rovers - Nottingham Forest: {'pass': 733, 'drive': 627, 'high_pass': 87, 'header': 77, 'throw_in': 31}
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Blackburn Rovers - Nottingham Forest/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Blackburn Rovers - Nottingham Forest/720p.possession.jsonl
+INFO Background extraído de 2019-10-01 - Blackburn Rovers - Nottingham Forest: 150 clips
+Using Backbone type: soccer_master
+Loaded backbone weights from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/backbone.pt
+Loading CaptionClassification head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/CaptionClassification.pt
+Loading KeypointsDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/KeypointsDetection.pt
+Loading LinesDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/LinesDetection.pt
+Loading SoccerNetGSR_Detection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/SoccerNetGSR_Detection.pt
+Loading VideoCaption head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/VideoCaption.pt
+=== Thu Jul 23 10:13:54 UTC 2026 -- Procesando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Brentford - Bristol City/ ===
+INFO Corriendo core.tracking (hybrid) sobre datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Brentford - Bristol City/720p.mp4 ...
+INFO Cargando SoccerMaster desde /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster ...
+FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+Loading weights:   0%|          | 0/400 [00:00<?, ?it/s]Loading weights: 100%|██████████| 400/400 [00:00<00:00, 15260.48it/s]
+[transformers] [1mSiglipVisionModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                          | Status     |  | 
+-------------------------------------------------------------+------------+--+-
+text_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+text_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+logit_bias                                                   | UNEXPECTED |  | 
+text_model.head.bias                                         | UNEXPECTED |  | 
+text_model.head.weight                                       | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+logit_scale                                                  | UNEXPECTED |  | 
+text_model.embeddings.token_embedding.weight                 | UNEXPECTED |  | 
+text_model.final_layer_norm.weight                           | UNEXPECTED |  | 
+text_model.final_layer_norm.bias                             | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+[transformers] Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49406. This may result in unexpected behavior.
+[transformers] Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49407. This may result in unexpected behavior.
+Loading weights:   0%|          | 0/390 [00:00<?, ?it/s]Loading weights: 100%|██████████| 390/390 [00:00<00:00, 15436.82it/s]
+[transformers] [1mSiglipTextModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                            | Status     |  | 
+---------------------------------------------------------------+------------+--+-
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.weight                               | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+logit_bias                                                     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_bias                       | UNEXPECTED |  | 
+vision_model.head.probe                                        | UNEXPECTED |  | 
+vision_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+logit_scale                                                    | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.weight                    | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.bias                                 | UNEXPECTED |  | 
+vision_model.post_layernorm.bias                               | UNEXPECTED |  | 
+vision_model.head.layernorm.weight                             | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.bias                      | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.bias                                 | UNEXPECTED |  | 
+vision_model.post_layernorm.weight                             | UNEXPECTED |  | 
+vision_model.head.layernorm.bias                               | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.weight                 | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_weight                     | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.weight                               | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.bias                   | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+INFO SoccerMaster listo: clip=30 frames, input=512x512, device=cuda, fp16=True
+INFO Cargando YOLO yolo11x.pt ...
+FutureWarning: The `ByteTrack` was deprecated since v0.28.0. It will be removed in v0.30.0.
+INFO Procesando datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Brentford - Bristol City/720p.mp4 — 1280x720 @ 25.0 fps, 142499 frames (chunk=30, stride=1)
+UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:4381.)
+WARNING 2019-10-01 - Brentford - Bristol City h1 @680ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @11240ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @11880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @15640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @26880ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @37400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @38840ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @40120ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @44240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @84480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @89640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @91240ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @92560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @95280ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @96920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @97440ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @98320ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @100480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @101400ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @102920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @103920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @105280ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @107160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @107840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @109400ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @114840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @115920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @141640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @143320ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @147760ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @149760ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @150360ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @151040ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @162400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @202640ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @208840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @209680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @221640ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @339160ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @350480ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @363680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @364760ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @366640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @369080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @371280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @373360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @383640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @394480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @395880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @396960ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @398960ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @455080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @466440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @468000ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @469880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @471240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @473840ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @490680ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @493040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @519760ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @524960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @526240ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @578080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @579600ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @587520ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @604920ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @629960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @643320ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @644160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @645240ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @645760ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @646440ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @745000ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @870120ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @876640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @949320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @955320ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @956480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1001080ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1001880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1062120ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1064280ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1076280ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1077480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1096600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1104120ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1105400ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1120160ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1124040ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1124920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1125560ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1126280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1126840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1128280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1131880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1284360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1286280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1289960ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1291560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1294920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1296080ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1363000ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1389160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1390600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1390680ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1392680ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1416160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1458640ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1463320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1464160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1488880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1520640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1548240ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1555920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1565880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1566640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1567880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1568920ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1578040ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1579280ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1581600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1583200ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1585040ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1589080ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1591400ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1610520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1611880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1612720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1617600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1624520ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1625600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1636000ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1637600ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1640320ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1643320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1678440ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1684560ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1686080ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1687680ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1689880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1690520ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1691520ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1695360ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1697440ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1699320ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1700960ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1703720ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1721080ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1723560ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1727160ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1728920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1735040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1744640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1747640ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1748440ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1750760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1753080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1753920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1778800ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1779800ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1780640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1781600ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1841440ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1846120ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1852200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1853720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1879680ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1881240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1896680ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1902600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1906320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1909000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1913240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1918040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1981280ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @1983080ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2006720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2011720ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2012520ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2013280ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2020200ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2020920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2055360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2059160ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2068640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2096560ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2097320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2099680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2101320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2102880ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2120800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2170440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2195000ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2241240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2270360ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2279480ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2298320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2303240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2354080ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2356920ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2361480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2369880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2371960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2468840ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2551080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2552160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2553640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2592840ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2594080ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2595600ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2596480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2600760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2605480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2623320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2624600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2625200ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2626720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2628280ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2672440ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2674640ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2678040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2680760ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2696240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2698200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2701200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2761400ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2762600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2763320ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2764840ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2765760ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2766800ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2767640ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2768600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2769080ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2769960ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2789400ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2793560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2794840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2798160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2806560ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2873640ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2877400ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2890720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @2968760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3010440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3034520ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3044760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3098960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3138600ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3141720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3146960ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3148920ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3152760ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3159320ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3161120ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3195800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3216760ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3229680ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3242280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3298720ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3302800ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3305960ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3308480ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3309560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3312000ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3312080ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3351760ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3352800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3355720ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3356360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3404120ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3431720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3485040ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3643680ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3711360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3715240ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3716800ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3718120ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3720360ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3727000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3798080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3799200ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3804960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3809480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3922200ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @3925200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4092560ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4106600ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4109520ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4132200ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4133280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4134680ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4137680ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4186600ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4188720ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4325960ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4330480ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4333040ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4335640ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4354960ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4356640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4420160ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4426640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4429760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4431160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4555880ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4557840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4568200ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4604680ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4709240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4751360ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4845240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4847600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @4955440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5017280ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5018960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5041920ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5101760ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5122040ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5136160ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5312720ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5313400ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5313920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5426960ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5428600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5466080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5468280ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5471680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5477320ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5477920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5479320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5504440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5672200ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Brentford - Bristol City h1 @5689120ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+INFO Positivos extraídos de 2019-10-01 - Brentford - Bristol City: {'pass': 618, 'drive': 475, 'high_pass': 96, 'header': 69, 'throw_in': 31}
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Brentford - Bristol City/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Brentford - Bristol City/720p.possession.jsonl
+INFO Background extraído de 2019-10-01 - Brentford - Bristol City: 150 clips
+Using Backbone type: soccer_master
+Loaded backbone weights from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/backbone.pt
+Loading CaptionClassification head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/CaptionClassification.pt
+Loading KeypointsDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/KeypointsDetection.pt
+Loading LinesDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/LinesDetection.pt
+Loading SoccerNetGSR_Detection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/SoccerNetGSR_Detection.pt
+Loading VideoCaption head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/VideoCaption.pt
+=== Thu Jul 23 11:05:54 UTC 2026 -- Procesando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Hull City - Sheffield Wednesday/ ===
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Hull City - Sheffield Wednesday/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Hull City - Sheffield Wednesday/720p.possession.jsonl
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1120ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @6240ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @7880ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @81880ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @234720ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @237240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @239400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @259480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @287280ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @289160ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @315440ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @382920ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @469800ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @518720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @600480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @639480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @640320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @642880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @645800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @688960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @690120ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @730400ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @732440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @761280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @811920ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @823720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @984920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @986240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1042400ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1043120ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1049640ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1156760ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1195560ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1284360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1288320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1293240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1367280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1413080ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1413600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1416600ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1441080ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1518120ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1520240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1521000ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1522760ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1652840ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1659720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1662080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1663040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1668040ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1669160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1671520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1672720ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1677720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1698040ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1725440ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1727280ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1758520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1798040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1825080ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1865760ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1869240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1871040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1871400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1873440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1875120ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @1876200ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2046440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2047920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2054400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2054440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2067680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2072200ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2074320ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2075920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2100360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2209440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2209640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2273080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2274440ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2364480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2367320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2520560ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2541360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2541960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2544960ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2648520ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2689760ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2693240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2694240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2712200ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2717480ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2765120ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2837040ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2850000ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2852640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2864480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2871200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2873880ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2896040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2896520ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2956400ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2958160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2965120ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2966800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2978960ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2985160ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2987080ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @2989080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3003840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3215880ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3219800ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3220840ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3289520ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3334000ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3341240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3358040ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3359800ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3378640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3483720ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3541480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3733600ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3934640ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3947920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @3981280ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4122960ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4124800ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4207040ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4222400ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4240760ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4255720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4298200ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4346680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4475000ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4543920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4544960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4645680ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4647520ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4651280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4686560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4704240ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4813320ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4813960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4815520ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4830760ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4831920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4832840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4857640ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4858320ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4859720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4860800ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4870480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4897280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4898720ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @4967800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @5128120ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @5182320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @5438360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @5493360ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Hull City - Sheffield Wednesday h1 @5626680ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+INFO Positivos extraídos de 2019-10-01 - Hull City - Sheffield Wednesday: {'pass': 511, 'drive': 434, 'high_pass': 115, 'header': 112, 'throw_in': 39}
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Hull City - Sheffield Wednesday/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Hull City - Sheffield Wednesday/720p.possession.jsonl
+INFO Background extraído de 2019-10-01 - Hull City - Sheffield Wednesday: 150 clips
+=== Thu Jul 23 11:07:40 UTC 2026 -- Procesando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Leeds United - West Bromwich/ ===
+INFO Corriendo core.tracking (hybrid) sobre datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Leeds United - West Bromwich/720p.mp4 ...
+INFO Cargando SoccerMaster desde /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster ...
+FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+Loading weights:   0%|          | 0/400 [00:00<?, ?it/s]Loading weights: 100%|██████████| 400/400 [00:00<00:00, 14848.15it/s]
+[transformers] [1mSiglipVisionModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                          | Status     |  | 
+-------------------------------------------------------------+------------+--+-
+text_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+text_model.final_layer_norm.bias                             | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+text_model.head.bias                                         | UNEXPECTED |  | 
+text_model.embeddings.token_embedding.weight                 | UNEXPECTED |  | 
+logit_bias                                                   | UNEXPECTED |  | 
+text_model.final_layer_norm.weight                           | UNEXPECTED |  | 
+text_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+logit_scale                                                  | UNEXPECTED |  | 
+text_model.head.weight                                       | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+[transformers] Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49406. This may result in unexpected behavior.
+[transformers] Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49407. This may result in unexpected behavior.
+Loading weights:   0%|          | 0/390 [00:00<?, ?it/s]Loading weights: 100%|██████████| 390/390 [00:00<00:00, 15696.19it/s]
+[transformers] [1mSiglipTextModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                            | Status     |  | 
+---------------------------------------------------------------+------------+--+-
+vision_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+vision_model.head.layernorm.bias                               | UNEXPECTED |  | 
+vision_model.post_layernorm.weight                             | UNEXPECTED |  | 
+vision_model.post_layernorm.bias                               | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.weight                               | UNEXPECTED |  | 
+vision_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.bias                   | UNEXPECTED |  | 
+logit_bias                                                     | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_bias                       | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.weight                    | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.bias                      | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.weight                 | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_weight                     | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.bias                                 | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.weight                               | UNEXPECTED |  | 
+logit_scale                                                    | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.bias                                 | UNEXPECTED |  | 
+vision_model.head.probe                                        | UNEXPECTED |  | 
+vision_model.head.layernorm.weight                             | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+INFO SoccerMaster listo: clip=30 frames, input=512x512, device=cuda, fp16=True
+INFO Cargando YOLO yolo11x.pt ...
+FutureWarning: The `ByteTrack` was deprecated since v0.28.0. It will be removed in v0.30.0.
+INFO Procesando datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Leeds United - West Bromwich/720p.mp4 — 1280x720 @ 25.0 fps, 146480 frames (chunk=30, stride=1)
+UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:4381.)
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @7560ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @12120ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @141400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @151120ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @449400ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @450560ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @456640ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @457400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @513800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @520240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @529600ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @530400ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @582840ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @602560ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @603560ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @616960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @877640ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @879920ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @895240ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @895880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @918440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @1347480ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @1354640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @1420240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @1573240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @1633200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2139440ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2208280ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2243560ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2635000ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2638680ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2670920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2689880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2714800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2896640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2897960ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @2900360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3026920ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3028760ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3029400ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3144480ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3176880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3215640ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3221560ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3231760ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3232880ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3264800ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3269800ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3284160ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3323040ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3325120ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3515600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3561240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3707640ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3728560ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @3746200ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4097800ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4102960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4103480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4139640ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4187280ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4188120ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4215880ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4325480ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4336840ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4518880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4519640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4554120ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4554600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4559400ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4559800ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4566160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4652520ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4688760ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4717000ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4718120ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4762480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4836240ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4855960ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4888880ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @4980400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @5030600ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @5350560ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @5366120ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @5368040ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @5477440ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @5825360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Leeds United - West Bromwich h1 @5847240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+INFO Positivos extraídos de 2019-10-01 - Leeds United - West Bromwich: {'pass': 578, 'drive': 492, 'high_pass': 102, 'header': 53, 'throw_in': 49}
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Leeds United - West Bromwich/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Leeds United - West Bromwich/720p.possession.jsonl
+INFO Background extraído de 2019-10-01 - Leeds United - West Bromwich: 150 clips
+Using Backbone type: soccer_master
+Loaded backbone weights from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/backbone.pt
+Loading CaptionClassification head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/CaptionClassification.pt
+Loading KeypointsDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/KeypointsDetection.pt
+Loading LinesDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/LinesDetection.pt
+Loading SoccerNetGSR_Detection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/SoccerNetGSR_Detection.pt
+Loading VideoCaption head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/VideoCaption.pt
+=== Thu Jul 23 12:00:39 UTC 2026 -- Procesando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Middlesbrough - Preston North End/ ===
+INFO Corriendo core.tracking (hybrid) sobre datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Middlesbrough - Preston North End/720p.mp4 ...
+INFO Cargando SoccerMaster desde /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster ...
+FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+Loading weights:   0%|          | 0/400 [00:00<?, ?it/s]Loading weights: 100%|██████████| 400/400 [00:00<00:00, 15242.31it/s]
+[transformers] [1mSiglipVisionModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                          | Status     |  | 
+-------------------------------------------------------------+------------+--+-
+text_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+logit_scale                                                  | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+text_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+text_model.final_layer_norm.bias                             | UNEXPECTED |  | 
+text_model.head.weight                                       | UNEXPECTED |  | 
+text_model.head.bias                                         | UNEXPECTED |  | 
+logit_bias                                                   | UNEXPECTED |  | 
+text_model.final_layer_norm.weight                           | UNEXPECTED |  | 
+text_model.embeddings.token_embedding.weight                 | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+[transformers] Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49406. This may result in unexpected behavior.
+[transformers] Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49407. This may result in unexpected behavior.
+Loading weights:   0%|          | 0/390 [00:00<?, ?it/s]Loading weights: 100%|██████████| 390/390 [00:00<00:00, 15412.53it/s]
+[transformers] [1mSiglipTextModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                            | Status     |  | 
+---------------------------------------------------------------+------------+--+-
+vision_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_bias                       | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.bias                                 | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.bias                                 | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+logit_scale                                                    | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.bias                   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_weight                     | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.weight                               | UNEXPECTED |  | 
+vision_model.head.probe                                        | UNEXPECTED |  | 
+vision_model.post_layernorm.bias                               | UNEXPECTED |  | 
+vision_model.head.layernorm.bias                               | UNEXPECTED |  | 
+logit_bias                                                     | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.weight                 | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.weight                    | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.bias                      | UNEXPECTED |  | 
+vision_model.head.layernorm.weight                             | UNEXPECTED |  | 
+vision_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+vision_model.post_layernorm.weight                             | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.weight                               | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+INFO SoccerMaster listo: clip=30 frames, input=512x512, device=cuda, fp16=True
+INFO Cargando YOLO yolo11x.pt ...
+FutureWarning: The `ByteTrack` was deprecated since v0.28.0. It will be removed in v0.30.0.
+INFO Procesando datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Middlesbrough - Preston North End/720p.mp4 — 1280x720 @ 25.0 fps, 146893 frames (chunk=30, stride=1)
+UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:4381.)
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @40680ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @42520ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @43720ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @45560ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @93560ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @228560ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @318640ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @373800ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @381680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @391360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @397000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @405560ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @414080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @415280ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @417160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @560680ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @588080ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @601440ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @680560ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @711520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @791440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @896400ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @899720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @939200ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @941200ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1011160ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1012000ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1051880ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1053240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1053960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1206040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1350320ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1355480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1376000ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1376720ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1407040ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1427320ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1428240ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1429280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1430200ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1452680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1467000ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1467720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1470720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1472280ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1472880ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1476840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1478120ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1479160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1482200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1698360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1698960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1843280ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1844000ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1844360ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1847200ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1942080ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1973000ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @1974840ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2185640ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2246440ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2289960ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2343920ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2487680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2600040ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2632720ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2633960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2671680ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2672960ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2675920ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2699000ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2699640ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2760400ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2765880ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @2860880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3021960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3236960ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3238560ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3245240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3246560ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3328800ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3394640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3574760ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3597840ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3650040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3693080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @3884120ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4015960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4090920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4091480ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4092480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4098840ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4106880ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4107240ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4159800ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4273080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4276800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4280600ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4345200ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4443760ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4444440ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4445560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4447480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4481440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4487520ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4491160ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4619600ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4620080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4624000ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4653840ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4707280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4708480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4710120ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4711360ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4711920ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4712880ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4713440ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4827080ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4828880ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4830400ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4831880ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @4855880ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5015080ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5016280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5038520ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5043720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5048240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5053640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5076400ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5369800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5377320ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5398680ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5408720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5409120ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5460080ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5466600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5528440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5619000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5705720ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5789520ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5793800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Middlesbrough - Preston North End h1 @5863800ms (HEADER): balón nunca detectado en la ventana, se descarta
+INFO Positivos extraídos de 2019-10-01 - Middlesbrough - Preston North End: {'pass': 548, 'drive': 498, 'high_pass': 104, 'header': 109, 'throw_in': 34}
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Middlesbrough - Preston North End/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Middlesbrough - Preston North End/720p.possession.jsonl
+INFO Background extraído de 2019-10-01 - Middlesbrough - Preston North End: 150 clips
+Using Backbone type: soccer_master
+Loaded backbone weights from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/backbone.pt
+Loading CaptionClassification head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/CaptionClassification.pt
+Loading KeypointsDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/KeypointsDetection.pt
+Loading LinesDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/LinesDetection.pt
+Loading SoccerNetGSR_Detection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/SoccerNetGSR_Detection.pt
+Loading VideoCaption head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/VideoCaption.pt
+=== Thu Jul 23 12:53:57 UTC 2026 -- Procesando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Reading - Fulham/ ===
+INFO Corriendo core.tracking (hybrid) sobre datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Reading - Fulham/720p.mp4 ...
+INFO Cargando SoccerMaster desde /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster ...
+FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+Loading weights:   0%|          | 0/400 [00:00<?, ?it/s]Loading weights: 100%|██████████| 400/400 [00:00<00:00, 15705.77it/s]
+[transformers] [1mSiglipVisionModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                          | Status     |  | 
+-------------------------------------------------------------+------------+--+-
+text_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+text_model.final_layer_norm.bias                             | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+text_model.embeddings.token_embedding.weight                 | UNEXPECTED |  | 
+text_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+text_model.final_layer_norm.weight                           | UNEXPECTED |  | 
+logit_bias                                                   | UNEXPECTED |  | 
+logit_scale                                                  | UNEXPECTED |  | 
+text_model.head.weight                                       | UNEXPECTED |  | 
+text_model.head.bias                                         | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+[transformers] Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49406. This may result in unexpected behavior.
+[transformers] Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49407. This may result in unexpected behavior.
+Loading weights:   0%|          | 0/390 [00:00<?, ?it/s]Loading weights: 100%|██████████| 390/390 [00:00<00:00, 15658.33it/s]
+[transformers] [1mSiglipTextModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                            | Status     |  | 
+---------------------------------------------------------------+------------+--+-
+vision_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+vision_model.head.probe                                        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+vision_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+vision_model.post_layernorm.bias                               | UNEXPECTED |  | 
+vision_model.head.layernorm.bias                               | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.weight                    | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.bias                      | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.weight                 | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.weight                               | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.bias                   | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_bias                       | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.weight                               | UNEXPECTED |  | 
+vision_model.post_layernorm.weight                             | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.bias                                 | UNEXPECTED |  | 
+logit_bias                                                     | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_weight                     | UNEXPECTED |  | 
+logit_scale                                                    | UNEXPECTED |  | 
+vision_model.head.layernorm.weight                             | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.bias                                 | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+INFO SoccerMaster listo: clip=30 frames, input=512x512, device=cuda, fp16=True
+INFO Cargando YOLO yolo11x.pt ...
+FutureWarning: The `ByteTrack` was deprecated since v0.28.0. It will be removed in v0.30.0.
+INFO Procesando datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Reading - Fulham/720p.mp4 — 1280x720 @ 25.0 fps, 145914 frames (chunk=30, stride=1)
+UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:4381.)
+WARNING 2019-10-01 - Reading - Fulham h1 @1720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @25840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @26840ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @27640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @45440ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @69120ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @320760ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @322160ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @519480ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @1421160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @1530840ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @2158560ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @2228080ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @2596440ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @2684520ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @2812960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @3802280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @5116720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @5495320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @5766320ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Reading - Fulham h1 @5766880ms (PASS): balón nunca detectado en la ventana, se descarta
+INFO Positivos extraídos de 2019-10-01 - Reading - Fulham: {'pass': 988, 'drive': 798, 'high_pass': 81, 'header': 51, 'throw_in': 37}
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Reading - Fulham/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Reading - Fulham/720p.possession.jsonl
+INFO Background extraído de 2019-10-01 - Reading - Fulham: 150 clips
+Using Backbone type: soccer_master
+Loaded backbone weights from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/backbone.pt
+Loading CaptionClassification head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/CaptionClassification.pt
+Loading KeypointsDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/KeypointsDetection.pt
+Loading LinesDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/LinesDetection.pt
+Loading SoccerNetGSR_Detection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/SoccerNetGSR_Detection.pt
+Loading VideoCaption head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/VideoCaption.pt
+=== Thu Jul 23 13:47:54 UTC 2026 -- Procesando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Stoke City - Huddersfield Town/ ===
+INFO Corriendo core.tracking (hybrid) sobre datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Stoke City - Huddersfield Town/720p.mp4 ...
+INFO Cargando SoccerMaster desde /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster ...
+FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+Loading weights:   0%|          | 0/400 [00:00<?, ?it/s]Loading weights:  39%|███▉      | 156/400 [00:00<00:00, 1477.89it/s]Loading weights:  84%|████████▍ | 336/400 [00:00<00:00, 1586.80it/s]Loading weights: 100%|██████████| 400/400 [00:00<00:00, 1511.80it/s]
+[transformers] [1mSiglipVisionModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                          | Status     |  | 
+-------------------------------------------------------------+------------+--+-
+text_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+text_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+text_model.head.bias                                         | UNEXPECTED |  | 
+text_model.final_layer_norm.bias                             | UNEXPECTED |  | 
+text_model.embeddings.token_embedding.weight                 | UNEXPECTED |  | 
+logit_scale                                                  | UNEXPECTED |  | 
+text_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+text_model.head.weight                                       | UNEXPECTED |  | 
+text_model.final_layer_norm.weight                           | UNEXPECTED |  | 
+logit_bias                                                   | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+[transformers] Model config: bos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49406. This may result in unexpected behavior.
+[transformers] Model config: eos_token_id must be `None` or an integer within the vocabulary (between 0 and 31999), got 49407. This may result in unexpected behavior.
+Loading weights:   0%|          | 0/390 [00:00<?, ?it/s]Loading weights: 100%|██████████| 390/390 [00:00<00:00, 15681.90it/s]
+[transformers] [1mSiglipTextModel LOAD REPORT[0m from: ./pretrained_models/google/siglip2-large-patch16-512
+Key                                                            | Status     |  | 
+---------------------------------------------------------------+------------+--+-
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.q_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.weight | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.v_proj.weight   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.bias     | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.weight        | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.weight            | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm1.bias          | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc2.bias              | UNEXPECTED |  | 
+vision_model.post_layernorm.bias                               | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.out_proj.bias   | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.mlp.fc1.bias              | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.self_attn.k_proj.weight   | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.weight                               | UNEXPECTED |  | 
+vision_model.head.mlp.fc1.bias                                 | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_weight                     | UNEXPECTED |  | 
+vision_model.head.layernorm.bias                               | UNEXPECTED |  | 
+vision_model.encoder.layers.{0...23}.layer_norm2.bias          | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.weight                    | UNEXPECTED |  | 
+logit_scale                                                    | UNEXPECTED |  | 
+vision_model.head.attention.out_proj.bias                      | UNEXPECTED |  | 
+vision_model.post_layernorm.weight                             | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.bias                   | UNEXPECTED |  | 
+vision_model.embeddings.position_embedding.weight              | UNEXPECTED |  | 
+vision_model.head.layernorm.weight                             | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.bias                                 | UNEXPECTED |  | 
+vision_model.head.attention.in_proj_bias                       | UNEXPECTED |  | 
+vision_model.embeddings.patch_embedding.weight                 | UNEXPECTED |  | 
+logit_bias                                                     | UNEXPECTED |  | 
+vision_model.head.probe                                        | UNEXPECTED |  | 
+vision_model.head.mlp.fc2.weight                               | UNEXPECTED |  | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+INFO SoccerMaster listo: clip=30 frames, input=512x512, device=cuda, fp16=True
+INFO Cargando YOLO yolo11x.pt ...
+FutureWarning: The `ByteTrack` was deprecated since v0.28.0. It will be removed in v0.30.0.
+INFO Procesando datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Stoke City - Huddersfield Town/720p.mp4 — 1280x720 @ 25.0 fps, 152741 frames (chunk=30, stride=1)
+UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at /pytorch/aten/src/ATen/native/TensorShape.cpp:4381.)
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @46800ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @201440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @375760ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @632520ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @666600ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @855360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1215200ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1309360ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1320840ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1564000ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1604480ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1610720ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1717520ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1783160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1784600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1805920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1806600ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1821000ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1822520ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1824520ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1825280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1826040ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1826760ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1827560ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1879360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1883960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1940760ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @1942720ms (HIGH PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2025000ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2028040ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2060640ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2061720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2093920ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2095320ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2096000ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2160520ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2162760ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2196280ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2238680ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2241920ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2243040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2251680ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2252600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2253200ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2456840ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2458160ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2468960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2470360ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2509880ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2576960ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2651560ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2652400ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2653520ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2680600ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2684200ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2724120ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2798600ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2800800ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2802120ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2806040ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2847720ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @2988480ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3044880ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3046600ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3048000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3071560ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3173280ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3198920ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3210360ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3218480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3218640ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3221480ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3227600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3496760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3502080ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3513280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3542720ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3653920ms (THROW IN): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3670480ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3672240ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3686560ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3770000ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3781160ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3827640ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @3832440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4039040ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4048800ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4050200ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4194080ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4216200ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4220280ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4244720ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4246960ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4252280ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4258680ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4346040ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4367720ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4721720ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4724400ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4725040ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4736320ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4779760ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4786600ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4787760ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4788520ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4821760ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4900120ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4901760ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @4912160ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5070800ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5089640ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5118440ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5121120ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5155520ms (HIGH PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5158640ms (HEADER): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5159840ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5160080ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5371600ms (HEADER): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5422920ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5423600ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5429680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5459720ms (THROW IN): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5493400ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5723680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5729200ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5867680ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5965800ms (PASS): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5967320ms (DRIVE): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5978600ms (PASS): balón nunca detectado en la ventana, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5979960ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @5984560ms (DRIVE): sin poseedor/balón resoluble cerca, se descarta
+WARNING 2019-10-01 - Stoke City - Huddersfield Town h1 @6062720ms (HEADER): balón nunca detectado en la ventana, se descarta
+INFO Positivos extraídos de 2019-10-01 - Stoke City - Huddersfield Town: {'pass': 676, 'drive': 589, 'high_pass': 93, 'header': 115, 'throw_in': 47}
+INFO tracks.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Stoke City - Huddersfield Town/720p.tracks.jsonl
+INFO possession.jsonl ya existe, reutilizando: datasets/SoccerNet/england_efl/2019-2020/2019-10-01 - Stoke City - Huddersfield Town/720p.possession.jsonl
+INFO Background extraído de 2019-10-01 - Stoke City - Huddersfield Town: 150 clips
+Using Backbone type: soccer_master
+Loaded backbone weights from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/backbone.pt
+Loading CaptionClassification head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/CaptionClassification.pt
+Loading KeypointsDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/KeypointsDetection.pt
+Loading LinesDetection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/LinesDetection.pt
+Loading SoccerNetGSR_Detection head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/SoccerNetGSR_Detection.pt
+Loading VideoCaption head from: /app/Soccer_Master/SoccerMaster/pretrained_models/SoccerMaster/VideoCaption.pt
+=== TODO TERMINADO ===

@@ -265,6 +265,12 @@ class YoloDetector:
             dets.class_id = np.asarray(
                 [ROLE_TO_CLASS_ID[r] for r in roles], dtype=int
             )
+            # sv.Detections.from_ultralytics() añade su propia clave "class_name"
+            # a .data; se descarta aquí para que el esquema de .data (solo
+            # role/jersey) coincida con el de SoccerMasterDetector — si no,
+            # HybridDetector.detect() no puede fusionar personas+balón
+            # (sv.Detections.merge exige las mismas claves en todos los .data).
+            dets.data = {}
             results.append(_with_role_data(dets, roles, [None] * len(dets)))
         return results
 

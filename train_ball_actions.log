@@ -1,0 +1,17 @@
+INFO Dataset: 9700 clips train, 1443 clips val (6 clases). Distribución train: Counter({'pass': 4104, 'drive': 3415, 'background': 896, 'high_pass': 574, 'header': 477, 'throw_in': 234})
+INFO [epoch 1/15] train_loss=0.7163 val_acc=0.726
+INFO [epoch 2/15] train_loss=0.3598 val_acc=0.716
+INFO [epoch 3/15] train_loss=0.2494 val_acc=0.755
+INFO [epoch 4/15] train_loss=0.1949 val_acc=0.766
+INFO [epoch 5/15] train_loss=0.1728 val_acc=0.741
+INFO [epoch 6/15] train_loss=0.1291 val_acc=0.776
+INFO [epoch 7/15] train_loss=0.1134 val_acc=0.755
+INFO [epoch 8/15] train_loss=0.1111 val_acc=0.776
+INFO [epoch 9/15] train_loss=0.0804 val_acc=0.780
+INFO [epoch 10/15] train_loss=0.0834 val_acc=0.771
+INFO [epoch 11/15] train_loss=0.0787 val_acc=0.784
+INFO [epoch 12/15] train_loss=0.0644 val_acc=0.774
+INFO [epoch 13/15] train_loss=0.0512 val_acc=0.779
+INFO [epoch 14/15] train_loss=0.0677 val_acc=0.755
+INFO [epoch 15/15] train_loss=0.0417 val_acc=0.782
+INFO Checkpoint guardado en models/r3d18_ball_actions.pt

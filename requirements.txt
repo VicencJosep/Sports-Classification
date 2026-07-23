@@ -51,6 +51,13 @@ joblib
 playwright>=1.45.0
 pillow
 
+# --- Ball Action Spotting (core/ball_actions.py, core/possession.py) ---
+# Descarga de Labels-ball.json/Labels-cameras.json/Labels-v2.json vía
+# scripts/download_ball_action_data.py. Pin igual al ya usado en
+# requirements-vjepa.txt (0.1.62) para no introducir una segunda versión sin
+# probar del mismo paquete.
+SoccerNet==0.1.62
+
 # --- Analytics / salida ---
 pandas>=2.1.0               # Agregación de métricas y export
 tqdm

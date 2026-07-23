@@ -2,8 +2,11 @@ __pycache__/
 .claude/
 clips_analisis/
 dataset_vjepa_backup/
+dataset_ball_actions/
+datasets/
 temp/
 models/
+.env
 
 basketball/inputs
 basketball/outputs

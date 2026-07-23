@@ -57,9 +57,31 @@ class EventsConfig:
 
 
 @dataclass(frozen=True)
+class BallActionsConfig:
+    """Hiperparámetros de core/ball_actions.py (clasificador R3D-18 fine-tuned).
+
+    Complementa a EventsConfig: en vez de un clip ya recortado por evento
+    (gol/falta/...), este clasificador opera sobre ventanas de ``num_frames``
+    centradas en el jugador que posee el balón (ver core/possession.py).
+    Clases: pass / drive / high_pass / header / throw_in / background (shot y
+    goal ya los cubre core/events.py, no se duplican aquí; tackle/cross/
+    ball_player_block quedan fuera de esta primera fase — clases minoritarias
+    o con riesgo de confusión visual, ver scripts/extract_ball_action_clips.py).
+    """
+
+    checkpoint_path: Path = PROJECT_ROOT / "models" / "r3d18_ball_actions.pt"
+    device: str | None = None               # None -> auto (cuda si hay)
+    num_frames: int = 32                    # ~1.06 s a 30 fps
+    padding_factor: float = 2.5             # expansión del bbox del poseedor antes de recortar
+    classes: tuple[str, ...] = ("pass", "drive", "high_pass", "header", "throw_in", "background")
+    max_possessor_distance_px: float = 150.0  # distancia máx. balón-jugador para resolver poseedor
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     """Configuración raíz que main.py pasará a cada módulo."""
 
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
     events: EventsConfig = field(default_factory=EventsConfig)
+    ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
     outputs_dir: Path = OUTPUTS_DIR
