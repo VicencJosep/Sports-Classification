@@ -1,0 +1,35 @@
+# ============================================================
+# Sports-Classification/basketball — pipeline de baloncesto
+# Aislado del requirements.txt de fútbol (raíz del repo): no compartir
+# ni fusionar entornos. Ver basketball/README.md.
+# ============================================================
+
+# --- Modelos Roboflow Universe ---
+# get_model(...) descarga los pesos una vez (autenticado con ROBOFLOW_API_KEY) y corre
+# .infer() localmente vía onnxruntime — no son llamadas HTTP por frame a un endpoint hosted.
+# Este `inference` de aquí instala onnxruntime (CPU). El Dockerfile lo sustituye después por
+# `inference-models[onnx-cu12]` (onnxruntime-gpu + pycuda) para correr en GPU: instalarlo aquí
+# directamente no basta porque compiten por el mismo namespace de import y el pip resolver no
+# sabe que son alternativos entre sí.
+inference>=0.30.0            # get_model(...) — jugadores/balón/árbitros y keypoints de cancha
+roboflow>=1.1.0               # descarga de datasets (basketball/scripts/download_datasets.py)
+
+# --- Core CV: tracking, dibujo, vídeo ---
+supervision>=0.25.0,<0.30    # ByteTrack + sv.Detections (mismo rango que fútbol; ver nota en su requirements.txt)
+opencv-python>=4.9.0
+numpy>=1.26.0
+pandas>=2.1.0
+
+# --- Deep Learning base ---
+# torch/torchvision FIJADOS a un build cu128, igual que en el requirements.txt de fútbol:
+# `pip install torch` sin pin resuelve a torch 2.13.0 (runtime CUDA 13.0 por defecto), que
+# rompe con "The NVIDIA driver on your system is too old" en el driver 570.211.01 (CUDA 12.8)
+# de este equipo. Mismo pin que fútbol para no reintroducir ese problema aquí también.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+transformers>=4.40.0          # pipeline zero-shot-image-classification (fashion-clip)
+pillow
+
+# --- OCR de dorsales (utils/legacy, no usado por el flujo principal aún) ---
+easyocr>=1.7.1

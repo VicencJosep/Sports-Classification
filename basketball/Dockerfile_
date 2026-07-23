@@ -1,0 +1,35 @@
+# Imagen aislada para el pipeline de baloncesto.
+# No comparte venv ni capas con el Dockerfile de la raíz (fútbol): imagen y
+# tag propios (ver basketball/README.md), para poder iterar sin tocar ni
+# reconstruir el contenedor de fútbol.
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu24.04
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    git \
+    libgl1 \
+    libglib2.0-0 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+ENV TRANSFORMERS_CACHE=/app/models
+ENV HF_HOME=/app/models
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# `inference` depende de `onnxruntime` (CPU) a secas. Para GPU no basta con instalar
+# onnxruntime-gpu a mano encima: el backend ONNX de `inference-models` además necesita
+# pycuda para el IOBinding en GPU (si no, MissingDependencyError en tiempo de inferencia).
+# El extra `onnx-cu12` de inference-models instala ambos ya coordinados para CUDA 12.x
+# (coherente con la imagen base nvidia/cuda:12.8-cudnn-devel usada aquí).
+RUN pip uninstall -y onnxruntime && pip install "inference-models[onnx-cu12]"
+
+CMD ["tail", "-f", "/dev/null"]

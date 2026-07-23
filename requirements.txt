@@ -1,0 +1,61 @@
+# ============================================================
+# Sports-Classification — Sports Analytics Pipeline (fútbol)
+# ============================================================
+
+# --- Core CV: detección + tracking ---
+ultralytics>=8.3.0          # YOLO11x (detección de jugadores/balón)
+supervision>=0.25.0,<0.30   # ByteTrack, sv.Detections, anotadores
+                            # (<0.30: ByteTrack está deprecado y se elimina en 0.30;
+                            #  migrar a la librería `trackers` de Roboflow llegado el caso)
+opencv-python>=4.9.0
+numpy>=1.26.0
+scipy>=1.11.0               # Interpolación 2D (homography)
+
+# --- Deep Learning base ---
+# torch/torchvision FIJADOS a un build cu128: `pip install torch` sin pin resuelve
+# hoy a torch 2.13.0, cuyo runtime CUDA por defecto es 13.0 (ver requires_dist en
+# PyPI: cuda-toolkit==13.0.3) y ESO ROMPE en cualquier host con driver <580.x, p.ej.
+# el driver 570.211.01 (CUDA 12.8) de este equipo: "RuntimeError: The NVIDIA driver
+# on your system is too old (found version 12080)" al primer .to("cuda"). Si
+# actualizáis el driver de la máquina, subid ambas versiones juntas (ver
+# https://download.pytorch.org/whl/cu128/torch/ y /torchvision/ para builds más
+# nuevos) — nunca sueltes el pin de "==" ni el índice sin comprobar el driver.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0+cu128
+torchvision==0.26.0+cu128
+# transformers FIJADO en == (no ">="): la API interna de Siglip (usada por
+# Soccer_Master/SoccerMaster/models/soccer_master.py) cambió entre versiones
+# (SiglipVisionModel dejó de anidar .vision_model; SiglipEncoderLayer dejó de
+# devolver tupla). El código vendorizado ya tiene fallbacks defensivos para
+# ambas APIs (ver README § "Problemas conocidos: Soccer_Master"), pero fijar
+# la versión evita que un tercer cambio de API rompa algo sin fallback aún.
+# 5.14.1 es la versión contra la que se diagnosticaron (17 jul 2026) los dos
+# problemas de API de Siglip documentados en el README — no implica que todo el
+# pipeline (core/events.py incluido) esté verificado end-to-end con ella todavía.
+transformers==5.14.1        # V-JEPA (events), ViT OCR (dorsales), MolmoWeb-4B
+timm
+av                          # Decodificación de vídeo para V-JEPA
+accelerate                  # Carga eficiente de VLMs en GPU
+
+# --- Detector SoccerMaster (Soccer_Master/SoccerMaster) ---
+einops                      # usado por models/soccer_master.py
+safetensors                 # carga de checkpoints
+lsq-ellipse                 # data/pnlcalib_utils (import "ellipse")
+decord                      # data/video_caption.py (lector de vídeo)
+
+# --- Clasificación de equipos (HSV / K-Means) ---
+scikit-learn>=1.4.0
+joblib
+
+# --- Automatización RRSS (MolmoWeb-4B + navegación web) ---
+playwright>=1.45.0
+pillow
+
+# --- Analytics / salida ---
+pandas>=2.1.0               # Agregación de métricas y export
+tqdm
+
+# --- Orquestador semántico (Q&A sobre vídeo) ---
+# NOTA: VideoARM / Symphony no se distribuyen por PyPI todavía.
+# Instalar desde su repositorio cuando se aborde orquestrator/agent.py:
+#   pip install git+https://github.com/<org>/videoarm.git

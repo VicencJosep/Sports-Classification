@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+inputs/*
+!inputs/.gitkeep
+outputs/*
+!outputs/.gitkeep
+datasets/*
+!datasets/.gitkeep
+models/

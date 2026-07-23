@@ -1,0 +1,47 @@
+__pycache__/
+.claude/
+clips_analisis/
+dataset_vjepa_backup/
+temp/
+models/
+
+basketball/inputs
+basketball/outputs
+basketball/models
+
+# ------------------------------------------------------------------ #
+# Soccer_Master: repo de terceros vendorizado. Se ignora todo salvo los
+# ficheros que hemos modificado/añadido nosotros (ver README § "Cambios
+# sobre el repositorio original Soccer_Master" para el detalle de cada uno).
+#
+# OJO con la sintaxis: "Soccer_Master/" (con barra, sin *) ignoraría el
+# directorio entero y las excepciones de abajo NO harían nada — git no
+# desciende a mirar dentro de un directorio ya ignorado. Por eso se usa
+# "carpeta/*" + "!carpeta/subcarpeta/" en cascada, un nivel cada vez, hasta
+# llegar a cada fichero concreto.
+# ------------------------------------------------------------------ #
+Soccer_Master/*
+!Soccer_Master/SoccerMaster/
+
+Soccer_Master/SoccerMaster/*
+!Soccer_Master/SoccerMaster/infer_mp4.py
+!Soccer_Master/SoccerMaster/eval_captions.py
+!Soccer_Master/SoccerMaster/eval_classification_head.py
+!Soccer_Master/SoccerMaster/models/
+
+Soccer_Master/SoccerMaster/models/*
+!Soccer_Master/SoccerMaster/models/soccer_master.py
+!Soccer_Master/SoccerMaster/models/deformable_detr/
+
+Soccer_Master/SoccerMaster/models/deformable_detr/*
+!Soccer_Master/SoccerMaster/models/deformable_detr/ops/
+
+Soccer_Master/SoccerMaster/models/deformable_detr/ops/*
+!Soccer_Master/SoccerMaster/models/deformable_detr/ops/functions/
+!Soccer_Master/SoccerMaster/models/deformable_detr/ops/modules/
+
+Soccer_Master/SoccerMaster/models/deformable_detr/ops/functions/*
+!Soccer_Master/SoccerMaster/models/deformable_detr/ops/functions/ms_deform_attn_func.py
+
+Soccer_Master/SoccerMaster/models/deformable_detr/ops/modules/*
+!Soccer_Master/SoccerMaster/models/deformable_detr/ops/modules/ms_deform_attn.py

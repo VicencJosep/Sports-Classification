@@ -1,0 +1,162 @@
+import cv2
+from visualizations.court_tempelete import build_court_template
+import numpy as np 
+from .mini_maps import dynamic_map , heat_map , foot_prints_map
+from utils import get_bottom_center_of_player , get_center_of_box
+from scoring_system import find_stats
+from .team_stats import StatsPanel
+from .scoring_effects import effects
+from .utils import check_which_team_offencing , smooth_curve
+from .game_momentum import get_momuntums 
+from .momunum_plot import draw_signal
+def compute_homography(
+    src_pts,
+    dst_pts ,
+    min_points = 4,
+    ransac_thresh = 5.0
+) :
+
+    if src_pts is None or len(src_pts) < min_points:
+        return None, None
+
+    H, mask = cv2.findHomography(
+        src_pts, dst_pts,
+        method=cv2.RANSAC,
+        ransacReprojThreshold=ransac_thresh,
+    )
+    return H, mask
+
+
+def draw_mini_court(
+    frames , 
+    detections , 
+    court_detectoins , 
+    teams_classifications ,
+    events
+) :
+    # MAP DETECTIONS TO COURT TEMPELETE POINTS
+    points_mapping = {
+        27: "ctl",
+        32: "ctr",
+        5: "cbr",
+        0: "cbl",
+        28: "TTLT",
+        31: "TTRT",
+        24: "TTLB",
+        25: "TTRB",
+        19: "TTR",
+        1: "TBLB",
+        4: "TBRB",
+        7: "TBLT",
+        8: "TBRT",
+        13: "TBR",
+        29: "PTLT",
+        30: "PTRT",
+        21: "PTLB",
+        23: "PTRB",
+        22: "PTC",
+        9: "PBLT",
+        11: "PBRT",
+        2: "PBLB",
+        3: "PBRB",
+        10: "PBC",
+        15: "CL",
+        14: "CR",
+        16: "CC",
+    }
+    court_template_dynamic, points    , top_arc_pts , bottom_arc_pts = build_court_template(BACKGROUND=(30,30,30))
+    THREE_LINE_TOP_LEFT = points['TTLT']
+    THREE_LINE_TOP_RIGHT = points['TTRT']
+    THREE_LINE_BOTTOM_LEFT = points['TBLT']
+    THREE_LINE_BOTTOM_RIGHT = points['TBRT']
+    court_template_heat_map_1 , points , _ , _ = build_court_template()
+    court_template_heat_map_2 , points , _ , _ = build_court_template()
+    court_templete_foot_prints , points , _ , _ = build_court_template(BACKGROUND=(130 ,130 ,130))
+    team_1_cumultive = []
+    team_2_cumultive = []
+    stats = {'boston' : {'score' : 0 , 'repond' : 0 , 'turnovers' : 0 , 'passes' : 0}  , 'new_york' : {'score' : 0 , 'repond' : 0 , 'turnovers' : 0 , 'passes' : 0}}
+    foot_prints = []
+    popup_events = []
+
+    # Tamaños de panel proporcionales al frame (los valores fijos originales
+    # -420/40 para el panel de stats, 600/250 para el de momentum- se pensaron
+    # para vídeo ~1080p; en clips más pequeños se salían del frame y se
+    # solapaban entre sí). Clamps para que el texto siga siendo legible.
+    frame_h , frame_w = frames[0].shape[:2]
+    stats_width = max(200 , min(420 , int(frame_w * 0.30)))
+    stats_row_height = max(20 , min(40 , int(frame_h * 0.05)))
+    stats_font_scale = max(0.35 , min(0.65 , 0.65 * stats_row_height / 40))
+    stats_thickness = 2 if stats_row_height >= 28 else 1
+    x_position = frame_w // 2 - stats_width // 2
+    panel = StatsPanel(x=x_position, y=20, width=stats_width, row_height=stats_row_height,
+                        alpha=0.80, font_scale=stats_font_scale, thickness=stats_thickness)
+
+    momentum_width = max(200 , min(600 , int(frame_w * 0.45)))
+    momentum_height = max(90 , min(250 , int(frame_h * 0.30)))
+    momentum_font_scale = max(0.4 , min(0.8 , 0.8 * momentum_height / 250))
+    momentum_x = frame_w // 2 - momentum_width // 2
+    momentum_y = frame_h - momentum_height - 20
+
+    MAP = check_which_team_offencing(events['player-in-possestion'] , detections , teams_classifications)
+    cumulative_momuntum = []
+
+    for i , (frame  , detection , court_detectoin , teams_classification ) in enumerate (zip(frames , detections , court_detectoins , teams_classifications )):
+        
+        # {'x': 413.0, 'y': 609.0, 'conf': 0.001953125, 'class_id': 3},
+        frame_court_detections = [] 
+        frame_tempelete_points = []
+
+
+        for p in court_detectoin : 
+            if p['class_id'] in points_mapping.keys() and p['conf'] > .5: 
+                point_key = points_mapping[p['class_id']] 
+                frame_tempelete_points.append(points[point_key]) 
+                frame_court_detections.append((p['x'] , p['y'])) 
+        frame_court_detections = np.array(frame_court_detections , dtype=np.float32) 
+        frame_tempelete_points = np.array(frame_tempelete_points , dtype=np.float32)
+        
+        H, mask = compute_homography(frame_court_detections, frame_tempelete_points)
+
+        stats, foot_prints, popup_events  = find_stats(stats, foot_prints,popup_events , events , i , teams_classifications , detections , H , top_arc_pts , bottom_arc_pts , THREE_LINE_TOP_LEFT , THREE_LINE_TOP_RIGHT , THREE_LINE_BOTTOM_LEFT , THREE_LINE_BOTTOM_RIGHT ) 
+        frame = panel.draw(frame, stats, title="TEAM STATS")
+        frame = foot_prints_map(i, frame, court_templete_foot_prints, foot_prints , 'bottom-left' , name='Footprints')
+        frame = effects(i , frame , popup_events , 30 ) 
+        cumulative_momuntum = get_momuntums(frame , i , teams_classification , detection , cumulative_momuntum , MAP , H , THREE_LINE_TOP_LEFT , THREE_LINE_TOP_RIGHT , THREE_LINE_BOTTOM_LEFT , THREE_LINE_BOTTOM_RIGHT)
+        color_signal = (0,0,255 ) if MAP[i] == 1 else (0 ,0,255)
+        frame = draw_signal(frame ,cumulative_momuntum , momentum_x , momentum_y ,
+                             width=momentum_width , height=momentum_height ,
+                             line_color=color_signal , fill_color=color_signal ,
+                             font_scale=momentum_font_scale )
+        team_1_positions = []
+        team_2_positions = [] 
+        ball_positions = []
+        ref_positiions = [] 
+        for box , class_id , tracker_id in zip(detection.xyxy , detection.class_id, detection.tracker_id) : 
+            if class_id in [1,3,4,5,6,7] : 
+                if tracker_id in teams_classification['boston'] : 
+                    x_center , y_center = get_bottom_center_of_player(box) 
+                    team_1_positions.append((x_center , y_center))
+                elif tracker_id in teams_classification['new_york'] : 
+                    x_center , y_center = get_bottom_center_of_player(box) 
+                    team_2_positions.append((x_center , y_center))
+
+            elif class_id == 8 : 
+                x_center , y_center = get_bottom_center_of_player(box) 
+                ref_positiions.append((x_center , y_center))
+            elif class_id == 0 : 
+                x_center , y_center = get_center_of_box(box) 
+                ball_positions.append((x_center , y_center))
+
+        # ── (c) overlays ─────────────────────────────────────
+        if H is not None:
+            frame = dynamic_map(i , frame , court_template_dynamic ,frame_court_detections , H ,
+                                [ (np.array(team_1_positions) , (0,0,255))
+                                   ,(np.array(team_2_positions) , (255,0,0) )  
+                                   ,(np.array(ball_positions) , (30, 255, 255) )
+                                   ] , position='top-left' , name='dynamic')
+            frame , team_1_cumultive = heat_map(frame , court_template_heat_map_1 ,H , np.array(team_1_positions ) 
+                                                , team_1_cumultive ,   position = 'top-right' , name ="Boston Heat" )
+            frame , team_2_cumultive = heat_map(frame , court_template_heat_map_2 ,H , np.array(team_2_positions ) 
+                                                , team_2_cumultive ,   position = 'bottom-right' , name='Newyork Heat' )
+
+    return frames , stats , foot_prints, cumulative_momuntum
