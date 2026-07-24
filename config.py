@@ -78,10 +78,25 @@ class BallActionsConfig:
 
 
 @dataclass(frozen=True)
+class ClassificationConfig:
+    """Hiperparámetros de core/classification.py (embeddings PRTReId + K-Means de equipos)."""
+
+    embedder: str = "prtreid"               # "prtreid" | "stub"
+    reid_weights_path: Path = PROJECT_ROOT / "models" / "reid" / "prtreid-soccernet-baseline.pth.tar"
+    reid_backbone_weights_path: Path = PROJECT_ROOT / "models" / "reid" / "hrnetv2_w32_imagenet_pretrained.pth"
+    device: str | None = None               # None -> auto (cuda si hay)
+    batch_size: int = 64                    # crops por lote a PRTReId
+    image_size: tuple[int, int] = (256, 128)  # (height, width), fijo por el checkpoint publicado
+    n_clusters: int = 2                     # nº de equipos (igual que TrackletTeamClustering original)
+    random_state: int = 0                   # semilla de K-Means (igual que el original)
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     """Configuración raíz que main.py pasará a cada módulo."""
 
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
     events: EventsConfig = field(default_factory=EventsConfig)
     ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
+    classification: ClassificationConfig = field(default_factory=ClassificationConfig)
     outputs_dir: Path = OUTPUTS_DIR

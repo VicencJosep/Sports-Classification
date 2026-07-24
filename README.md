@@ -11,8 +11,8 @@ Sistema de **Sports Analytics para fútbol** que procesa vídeos de partidos con
 ```
                         ┌──────────────── BOTTOM-UP (batch) ────────────────┐
  partido.mp4 ──► core/tracking.py ──► core/classification.py ──► core/homography.py
-                 (YOLO11x+ByteTrack)   (equipos HSV/K-Means,      (px → metros 2D)
-                                        dorsales ViT-OCR)
+                 (YOLO11x+ByteTrack)   (equipos: PRTReId+K-Means; (px → metros 2D)
+                                        dorsal ViT-OCR pendiente)
                         │
                  core/events.py  (V-JEPA2 + SVC, eventos: gol/penalti/falta/...)
                         │
@@ -37,7 +37,7 @@ Sports-Classification/
 │   ├── tracking.py            # ✅ YOLO11x + SoccerMaster + ByteTrack (genera sv.Detections con IDs)
 │   ├── possession.py          # ✅ Poseedor del balón por frame (jugador más cercano al balón)
 │   ├── homography.py          # ⏳ Calibración del campo, matriz H, interpolación 2D
-│   ├── classification.py      # ⏳ Filtro HSV / K-Means de equipos + ViT OCR dorsales
+│   ├── classification.py      # ✅ Asignación de equipo (PRTReId + K-Means, 2 clusters); dorsal (ViT OCR) pendiente
 │   ├── events.py              # ✅ Inferencia de eventos (V-JEPA2 + SVC) sobre un clip .mp4
 │   └── ball_actions.py        # ✅ Inferencia de pase/regate/entrada (R3D-18) sobre ventana T=32
 ├── scripts/
@@ -52,7 +52,7 @@ Sports-Classification/
 ├── automation/
 │   └── molmo_publisher.py     # ⏳ MolmoWeb-4B + Playwright (publicación RRSS)
 ├── utils/
-│   ├── visualizers.py         # ✅ TrackingVisualizer (cajas/IDs/estelas, roboflow/supervision)
+│   ├── visualizers.py         # ✅ TrackingVisualizer (cajas/IDs/estelas o por equipo, roboflow/supervision)
 │   └── legacy_inference_demo.py  # Demo original YOLO+supervision (referencia)
 ├── svc_classifier_more_penalties.joblib  # Clasificador SVC entrenado (16 clases, ver abajo)
 ├── Dockerfile
@@ -151,6 +151,80 @@ Notas de diseño de `core/tracking.py`:
 - `anchor_xy` es el **bottom-center** de la caja: el punto de apoyo del jugador con el suelo, que es el que debe proyectarse con la matriz de homografía.
 - `process_video()` es un **generador**, pensado para encadenarse a colas asíncronas sin cargar el vídeo en memoria.
 - El balón de SoccerMaster casi nunca se detecta (dataset GSR centrado en personas); de ahí el `HybridDetector` por defecto, que combina personas de SoccerMaster con balón de YOLO11x.
+
+## Uso — clasificación de equipos (`core/classification.py`, PRTReId + K-Means)
+
+Asigna cada `tracker_id` de un vídeo ya trackeado a uno de 2 equipos, por apariencia. Puerto del
+algoritmo real de `Soccer_Master/sn-gamestate/sn_gamestate/team/tracklet_team_clustering_api.py`
+(`TrackletTeamClustering`) fuera de tracklab/Hydra/pandas — no es una reimplementación desde cero.
+
+```bash
+python -m core.tracking --source partido.mp4 --output tracks.jsonl --detector hybrid --device cuda
+
+python -m core.classification --source partido.mp4 --tracks tracks.jsonl --output teams.json --device cuda
+# --embedder stub corre el mismo pipeline sin GPU ni prtreid instalado (color medio del
+# crop en vez de un embedding aprendido) — útil para probar el resto del pipeline en seco.
+```
+
+Algoritmo (idéntico al original, verificado línea a línea contra su código fuente):
+
+1. Recorta cada detección con `role=="player"` de `tracks.jsonl` (goalkeeper/referee/ball quedan
+   fuera del clustering, igual que en `TrackletTeamClustering`).
+2. Extrae un embedding de apariencia de 256-d por crop vía **PRTReId** (BPBReID + backbone
+   HRNet32, entrenado en SoccerNet) — o, con `--embedder stub`, el color medio BGR del crop.
+3. Promedia los embeddings de cada `tracker_id` (media, no mediana ni "frame más nítido" —
+   así lo hace el original) y separa esas medias con `KMeans(n_clusters=2, random_state=0)`
+   (sin normalizar antes, igual que el original).
+
+`teams.json` (un único objeto, no JSONL — es un resultado a nivel de vídeo completo):
+
+```json
+{
+  "source_video": "partido.mp4", "tracks_jsonl": "tracks.jsonl",
+  "embedder": "prtreid", "embedding_dim": 256, "n_clusters": 2, "random_state": 0,
+  "teams": [{"tracker_id": 7, "team_cluster": 0}, {"tracker_id": 12, "team_cluster": 1}],
+  "excluded": [{"tracker_id": 3, "reason": "never_player"}, {"tracker_id": 45, "reason": "no_valid_crops"}],
+  "n_frames_processed": 812, "n_crops_embedded": 5123, "n_crops_skipped_degenerate": 2
+}
+```
+
+Join trivial para `analytics/engine.py`: `{t["tracker_id"]: t["team_cluster"] for t in teams["teams"]}`.
+
+### Vídeo anotado por equipo (`--annotated-output`)
+
+```bash
+python -m core.classification --source partido.mp4 --tracks tracks.jsonl --output teams.json \
+       --annotated-output teams.mp4 --device cuda
+```
+
+Escribe un `.mp4` con cajas + etiqueta coloreadas por **equipo** (rojo/azul; gris para quien no
+tenga equipo asignado — árbitros, porteros, tracks excluidos) en vez de por `tracker_id` como hace
+`core/tracking.py --annotated-output`. Es una **segunda pasada** sobre el vídeo (decodifica de
+nuevo, barato, sin re-ejecutar el detector ni PRTReId) — necesaria porque el equipo de cada
+jugador no se conoce hasta que se ha visto el vídeo entero (K-Means necesita todos los tracklets a
+la vez). La reutiliza `utils/visualizers.py::render_annotated_video`, que lee directamente
+`tracks.jsonl` reconstruyendo las detecciones — no depende de `core.tracking` en absoluto, así que
+también sirve para volver a renderizar sin tener el pipeline de tracking cargado en memoria.
+
+✅ **Verificado visualmente en ejecución real** (17 jul 2026, mismo clip) contra un frame extraído
+del vídeo resultante: dos grupos de jugadores bien separados por color, los 4 árbitros del clip
+correctamente en gris con su rol visible, y un jugador lejos del resto del grupo agrupado
+correctamente con su equipo por apariencia (no por cercanía en el campo — confirma que usa el
+embedding real).
+
+✅ **Verificado en ejecución real** (17 jul 2026, `datasets/clips_analisis/corner/corner118.mp4`,
+`--device cuda`) de punta a punta con `--embedder prtreid`. `prtreid`/`bpbreid` no están
+vendorizados ni se distribuyen por PyPI — se instalan vía git sin versión fijada (ver
+`requirements.txt` y § "Problemas conocidos" más abajo, que documenta los cinco incidentes reales
+que hubo que resolver para llegar hasta aquí: dos imports rotos parcheados con stubs en
+`sys.modules`, un dataset que había que registrar a mano, y un `torch.load` que había que forzar a
+`weights_only=False`). Si tras reconstruir la imagen algo vuelve a fallar al cargar el modelo o
+extraer embeddings, empieza por ahí — usa `--embedder stub` mientras tanto para no bloquear el
+resto del pipeline.
+
+Explícitamente fuera de alcance (ver roadmap): etiquetado izquierda/derecha de equipo (necesita
+`core/homography.py`, que a su vez depende de PnLCalib, sin vendorizar/verificar todavía) y OCR de
+dorsales (la otra mitad de este módulo en el roadmap).
 
 ## Uso — módulo de eventos (`core/events.py`, standalone)
 
@@ -329,7 +403,7 @@ python -m core.ball_actions --source dataset_ball_actions/pass/algun_clip.mp4
 | Orden | Módulo | Descripción |
 |-------|--------|-------------|
 | 1 | `core/tracking.py` | ✅ Detección + tracking |
-| 2 | `core/classification.py` | Asignación de equipo (HSV/K-Means sobre crops) + dorsal (ViT OCR) |
+| 2 | `core/classification.py` | ✅ Asignación de equipo (PRTReId + K-Means); dorsal (ViT OCR) queda pendiente |
 | 3 | `core/homography.py` | Keypoints del campo → matriz H (ver `Soccer_Master/sn_calibration` como referencia) |
 | 4 | `analytics/engine.py` | Métricas + `telemetry.json` |
 | 5 | `core/events.py` | ✅ Clasificación de eventos (V-JEPA2 + SVC) sobre clips ya recortados; falta el troceado de partido completo → clips |
@@ -433,7 +507,118 @@ dentro de una carpeta ya ignorada).
 ### Versiones fijadas actualmente (RTX 4090, driver 570.211.01, dentro del contenedor)
 
 - `torch==2.11.0+cu128`, `torchvision==0.26.0+cu128` — confirmado: soluciona el incidente #1 (se probó de verdad, el contenedor llegó más allá del punto donde crasheaba).
-- `transformers==5.14.1` — versión contra la que se diagnosticaron y parchearon los incidentes #2 y #3. El incidente #2 se confirmó solucionado en ejecución real; el #3 tiene el fix escrito pero **pendiente de confirmar** en una ejecución (última vez visto en el traceback, aún no reintentado). Si lo ejecutas y funciona, sería buen momento para borrar este matiz. Si falla de otra forma, hay un cuarto incidente por documentar aquí.
+- `transformers==5.14.1` — versión contra la que se diagnosticaron y parchearon los incidentes #2 y #3. Ambos **confirmados solucionados en ejecución real** (`python -m core.tracking` completo, `--detector hybrid --device cuda`, sin errores).
+
+### Dependencias solo-git sin pin: `prtreid`/`bpbreid` (`core/classification.py`)
+
+Segunda instancia del mismo patrón de riesgo que `transformers`/`torch` sin pin (arriba): PRTReId
+(el extractor de embeddings de apariencia que usa `core/classification.py` para asignar equipos)
+depende de `prtreid`/`bpbreid`, dos paquetes que **no se distribuyen por PyPI** — la única
+instalación documentada por sus propios autores es `pip install git+https://github.com/VlSomers/prtreid`
+(sin commit fijado). Un `docker build` en un día distinto puede traer una versión distinta sin
+ningún aviso. Si `core/classification.py` con `--embedder prtreid` falla al cargar el modelo o al
+extraer embeddings tras reconstruir la imagen, sospecha esto primero — usa `--embedder stub`
+mientras tanto para no bloquearte, y compara contra el `cfg`/versión que funcionó la última vez.
+
+**Incidente concreto ya visto (17 jul 2026)**: `from prtreid.scripts.main import build_config`
+importa en cascada `prtreid.utils.visualization`, que llama a `matplotlib.cm.get_cmap('hsv')` —
+eliminada en `matplotlib` 3.9 (existía, deprecada, hasta 3.8.x). Como `prtreid`/`torchreid` no
+pinean `matplotlib` en sus propios requisitos, `pip install` resolvía la última (3.11.1) y
+`core/classification.py` reventaba con `AttributeError: module 'matplotlib.cm' has no attribute
+'get_cmap'` **al importar `prtreid`, no al usar nada de plotting nuestro** — mismo patrón exacto
+que los incidentes de `transformers`/Siglip: una dependencia transitiva sin pin, no algo que
+hiciéramos mal. Fix: `matplotlib<3.9` fijado en `requirements.txt`.
+
+Justo detrás, mismo `import prtreid` en cascada, apareció un segundo incidente de naturaleza
+distinta: `prtreid.data.data_augmentation.random_occlusion` importa `skimage` a nivel de módulo
+(aumento de datos de entrenamiento, que no usamos en inferencia) pero `scikit-image` no está en
+el empaquetado de `prtreid` — no es un conflicto de versión, es una dependencia real que falta
+del todo (`ModuleNotFoundError: No module named 'skimage'`). Fix: `scikit-image` añadido a
+`requirements.txt`.
+
+Un tercer incidente, más profundo, en el mismo fichero: tras resolver `skimage`, ese mismo
+`random_occlusion.py` hace `from albumentations import (DualTransform, functional)`, y
+`functional` como submódulo importable directamente desde la raíz de `albumentations` es una API
+de versiones MUY anteriores a las reorganizaciones internas por tipo de efecto (blur/crops/
+geometric/...) que tiene el paquete desde hace varias versiones mayores — **ninguna versión
+razonablemente reciente de `albumentations` la expone así**, y bajar a una versión lo bastante
+vieja para que exista arriesga romper otra cosa en la cadena de dependencias (numpy 2.x, compat
+con Python 3.12, etc.). Confirmado en ejecución real (17 jul 2026):
+`ImportError: cannot import name 'functional' from 'albumentations'`.
+
+Esta vez el fix NO es un pin en `requirements.txt` — es código en
+`core/classification.py::_stub_prtreid_random_occlusion()`: inyecta un módulo vacío (con un
+`RandomOcclusion` dummy, porque otros módulos de `prtreid` sí necesitan que ese nombre exista) en
+`sys.modules` **antes** de que `import prtreid` intente cargar el fichero real, así que el import
+roto ni se ejecuta. `random_occlusion.py` es aumento de datos para ENTRENAMIENTO — no lo usamos,
+solo llamamos a `FeatureExtractor` para inferencia — así que perdernos ese fichero no quita
+funcionalidad real. La técnica (pre-poblar `sys.modules` con un stub antes del import que lo
+dispara) está verificada de forma aislada, sin `prtreid` instalado, antes de aplicarla. Vive en
+nuestro propio código (no en `site-packages`), así que sobrevive a cualquier reconstrucción de la
+imagen — a diferencia de parchear el paquete instalado directamente.
+
+Un cuarto incidente, ya no de import sino de **configuración**: una vez `import prtreid` funciona,
+`prtreid.scripts.main.build_config(config=yacs_cfg)` llama internamente a
+`compute_parts_num_and_names(cfg)`, que necesita ALGÚN dataset registrado bajo el nombre que
+digan `cfg.data.sources`/`targets` (`"SoccerNet"` en nuestro `cfg`, copiado del `prtreid.yaml` de
+`sn-gamestate`). El propio `prtreid` **no** registra ningún dataset por defecto — solo
+`sn-gamestate` lo hace, con su propia `sn_gamestate.reid.prtreid_dataset.ReidDataset` (fuertemente
+acoplada a `tracklab`: necesita un `TrackingDataset` completo con splits de train/query/gallery
+de ground truth, inviable de replicar solo para inferencia). Confirmado en ejecución real
+(17 jul 2026): `ValueError: Invalid dataset name. Received "SoccerNet", but expected to be one of
+[...]`. Fix, en `core/classification.py::_register_prtreid_soccernet_dataset()`: `prtreid` SÍ trae
+su propia clase `SoccerNet` (`prtreid.data.datasets.image.soccernet.SoccerNet`), importada pero no
+registrada por defecto — la registramos nosotros bajo el nombre `"SoccerNet"`. No hace falta que
+sea idéntica a la `ReidDataset` de `sn-gamestate`: con `masks.dir="pose_on_img_crops"` (nuestro
+`cfg`), tanto una como la otra devuelven `None` en `get_masks_config` (ninguna reconoce esa
+clave), así que el resultado final es el mismo da igual cuál se registre. Solo se registra la
+clase (nunca se instancia), así que no dispara ningún escaneo de disco de un dataset que no
+tenemos.
+
+Un quinto incidente, ya sin relación con imports: una vez `build_config` puede resolver el
+dataset, intenta leer el propio checkpoint (`load_checkpoint(cfg.model.load_weights)`, dentro de
+`prtreid.utils.torchtools`) llamando a `torch.load(fpath, map_location=...)` sin especificar
+`weights_only`. Desde PyTorch 2.6 el valor por defecto de ese argumento cambió de `False` a
+`True`, y el checkpoint publicado de PRTReId (un pickle con objetos `numpy.core.multiarray.scalar`
+de una versión de numpy antigua) no pasa esa comprobación de seguridad por defecto. Confirmado en
+ejecución real (17 jul 2026): `_pickle.UnpicklingError: Weights only load failed ... Unsupported
+global: GLOBAL numpy.core.multiarray.scalar`. Fix, en
+`core/classification.py::_patch_torch_load_weights_only_false()`: parchea `torch.load` para que
+use `weights_only=False` por defecto, con ámbito acotado al proceso (no toca `site-packages` ni
+desactiva la comprobación de seguridad para el resto del proyecto) — aceptable porque el
+checkpoint viene de una URL de Zenodo fija que ya verificamos por MD5 antes de usar, no es un
+pickle arbitrario de origen desconocido.
+
+✅ **Con estos cinco fixes, el pipeline completo de `core/classification.py --embedder prtreid`
+corre de punta a punta** (verificado en ejecución real, 17 jul 2026, sobre
+`datasets/clips_analisis/corner/corner118.mp4`: 23 tracklets → 11 vs 12 por equipo, 5 excluidos
+como `never_player`, 778 crops embebidos, 0 degenerados). De paso se confirmó empíricamente algo
+que en el plan original quedaba marcado como suposición sin verificar: PRTReId normaliza los
+crops con estadísticas estándar de ImageNet (`mean=[0.485, 0.456, 0.406], std=[0.229, 0.224,
+0.225]`) tras un resize a 256×128 — se ve en el log de `FeatureExtractor` al construirse.
+
+Nota menor, no un bug: `build_config` crea al final un directorio numérico vacío en la raíz del
+proyecto (`os.makedirs(cfg.data.save_dir)`, con `cfg.project.job_id` sin fijar explícitamente por
+nosotros) — es un directorio de logs de `prtreid` que no usamos para nada; se puede borrar sin
+miedo (`rmdir <número>`) y no debería ir a git.
+
+**Patrón a esperar**: `import prtreid` arrastra un árbol de imports grande (data augmentation,
+visualización, engines de entrenamiento...) que no necesitamos para inferencia pero que igualmente
+tiene que resolver en el momento de importar. Es plausible que aparezcan más
+`ModuleNotFoundError`/`ImportError`/`AttributeError` de este estilo la primera vez que se
+reconstruya la imagen desde cero — no asumas que el próximo será alguno de los tres de arriba
+otra vez; sigue el traceback hasta el import que falla y decide caso por caso si el fix es un pin
+en `requirements.txt` (si es una API que existe en OTRA versión del paquete) o un stub en
+`sys.modules` como este (si es un fichero de `prtreid` que no necesitamos para nada y cuya API
+esperada ya no existe en ninguna versión razonable).
+
+Tercera instancia del mismo patrón, ya autodocumentada en su propio fichero: `core/homography.py`
+depende de una copia externa de [PnLCalib](https://github.com/mguti97/PnLCalib) que tampoco está
+vendorizada ni verificada end-to-end en este repo (ver el aviso al principio de ese fichero).
+
+Puntero cruzado para quien llegue a depurar cualquiera de las tres: `torch`/`transformers`
+(pineados en `requirements.txt`, incidentes documentados arriba), `prtreid`/`bpbreid` (sin pin,
+esta sección), `PnLCalib` (sin vendorizar, docstring de `core/homography.py`).
 
 ### Si algo se rompe otra vez tras un `docker build`
 

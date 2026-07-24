@@ -43,9 +43,37 @@ safetensors                 # carga de checkpoints
 lsq-ellipse                 # data/pnlcalib_utils (import "ellipse")
 decord                      # data/video_caption.py (lector de vídeo)
 
-# --- Clasificación de equipos (HSV / K-Means) ---
+# --- Clasificación de equipos (core/classification.py: embeddings PRTReId + K-Means) ---
 scikit-learn>=1.4.0
 joblib
+requests                    # descarga de checkpoints PRTReId (Zenodo, con verificación MD5)
+# prtreid/bpbreid NO se distribuyen por PyPI (solo git, del equipo de investigación de
+# PRTReId/SoccerNet) y no tienen tag/release fijado que se pueda pinnear a una versión:
+# "HEAD de main" es la única instalación documentada por el propio proyecto. Es una
+# categoría de riesgo NUEVA respecto al resto de este fichero (todo lo demás aquí, o fija
+# versión exacta con ==, o al menos tiene un suelo >= razonable contra un paquete
+# versionado en PyPI): un `docker build` en un día distinto puede traer un `prtreid`/
+# `bpbreid` distinto del que se probó por última vez, SIN ningún aviso — mismo patrón que
+# rompió torch/transformers sin pin (ver README § "Problemas conocidos"). Si algo de
+# core/classification.py rompe tras reconstruir la imagen, sospecha esto primero. En
+# cuanto tengas una combinación que funcione end-to-end, fija un commit SHA concreto
+# (`git+https://github.com/VlSomers/prtreid@<sha>`).
+git+https://github.com/VlSomers/bpbreid
+git+https://github.com/VlSomers/prtreid
+# matplotlib FIJADO <3.9: prtreid.utils.visualization (importado en cascada por
+# `from prtreid.scripts.main import build_config`, aunque core/classification.py
+# no dibuja nada) llama a `matplotlib.cm.get_cmap('hsv')` — una función eliminada
+# en matplotlib 3.9 (existía, deprecada, hasta 3.8.x). Sin este pin, pip resuelve
+# la última matplotlib (transitiva, no declarada explícitamente por prtreid) y
+# revienta con "AttributeError: module 'matplotlib.cm' has no attribute
+# 'get_cmap'" al importar prtreid, confirmado en ejecución real (17 jul 2026).
+matplotlib<3.9
+# scikit-image: prtreid.data.data_augmentation.random_occlusion la importa a nivel
+# de módulo (aug. de datos de entrenamiento, que no usamos en inferencia) pero
+# rompe el import de todo `prtreid` si falta -- no es un conflicto de versión como
+# matplotlib, es que prtreid no la declara en su propio empaquetado. Confirmado en
+# ejecución real (17 jul 2026): "ModuleNotFoundError: No module named 'skimage'".
+scikit-image
 
 # --- Automatización RRSS (MolmoWeb-4B + navegación web) ---
 playwright>=1.45.0

@@ -767,7 +767,7 @@ def main() -> None:
         sink: Optional[sv.VideoSink] = None
         visualizer = None
         if args.annotated_output:
-            from utils.visualizers import TrackingVisualizer  # import perezoso: evita ciclo con core.tracking
+            from utils.visualizers import TrackingVisualizer  # import perezoso: solo si se pide --annotated-output
 
             video_info = sv.VideoInfo.from_video_path(args.source)
             video_info.fps = max(1, round(video_info.fps / args.stride))
@@ -779,7 +779,7 @@ def main() -> None:
         ):
             f.write(json.dumps(result.to_telemetry()) + "\n")
             if sink is not None:
-                sink.write_frame(visualizer.annotate(result.frame, result))
+                sink.write_frame(visualizer.annotate(result.frame, result.detections, result.ball_detections))
             if result.frame_idx % 100 == 0:
                 logger.info(
                     "frame %d — %d tracks, balón: %s",
