@@ -12,13 +12,17 @@ Sistema de **Sports Analytics para fútbol** que procesa vídeos de partidos con
                         ┌──────────────── BOTTOM-UP (batch) ────────────────┐
  partido.mp4 ──► core/tracking.py ──► core/classification.py ──► core/homography.py
                  (YOLO11x+ByteTrack)   (equipos: PRTReId+K-Means; (px → metros 2D)
-                                        dorsal ViT-OCR pendiente)
-                        │
-                 core/events.py  (V-JEPA2 + SVC, eventos: gol/penalti/falta/...)
-                        │
-                        ▼
-              analytics/engine.py ──► telemetry.json  ◄── fuente única de verdad
-                                          │
+                    │                   dorsal ViT-OCR pendiente)
+                    ▼
+             core/possession.py ──► core/ball_actions.py   core/events.py
+             (poseedor por frame)   (R3D-18, por cambio     (V-JEPA2+SVC, evento
+                    │                de poseedor)            del clip entero)
+                    └───────────────────────┬───────────────────────┘
+                                             ▼
+                    analytics/engine.py ──► vídeo final anotado + telemetry.json
+                                          (fuente única de verdad — hoy: clips
+                                           cortos ya recortados, no partido completo)
+                                                 │
               ┌───────────────────────────┴───────────────────────────┐
               ▼                                                       ▼
    orquestrator/agent.py                                automation/molmo_publisher.py
@@ -46,7 +50,7 @@ Sports-Classification/
 ├── training/
 │   └── train_ball_actions.py  # ✅ Fine-tuning R3D-18 sobre los clips extraídos
 ├── analytics/
-│   └── engine.py              # ⏳ Velocidades, posesión, heatmaps, JSON builder
+│   └── engine.py              # ✅ Composición final: equipo+posesión+ball_actions+events -> vídeo + telemetry.json
 ├── orquestrator/
 │   └── agent.py               # ⏳ VideoARM / Symphony (Q&A sobre el .mp4)
 ├── automation/
@@ -398,6 +402,64 @@ no divergir entre entrenamiento e inferencia).
 python -m core.ball_actions --source dataset_ball_actions/pass/algun_clip.mp4
 ```
 
+## Uso — composición final (`analytics/engine.py`)
+
+Une todo lo anterior en un único vídeo anotado + `telemetry.json`: tracking (cajas/IDs) +
+equipos (color) + posesión (calculada aquí a partir de `tracks.jsonl`, no hace falta correr
+`core/possession.py` aparte) + acción de balón (`core/ball_actions.py`, una vez por cada cambio
+de poseedor) + evento (`core/events.py`, una vez para todo el clip).
+
+```bash
+python -m core.tracking --source clip.mp4 --output tracks.jsonl --detector hybrid --device cuda
+python -m core.classification --source clip.mp4 --tracks tracks.jsonl --output teams.json --device cuda
+
+python -m analytics.engine --source clip.mp4 --tracks tracks.jsonl --teams teams.json \
+       --output final.mp4 --telemetry telemetry.json --device cuda
+# --teams es opcional (sin él, las cajas se colorean por tracker_id en vez de por equipo)
+# --skip-ball-actions / --skip-events omiten esa parte del análisis (y no cargan el modelo pesado
+# correspondiente) si solo quieres probar el resto del pipeline más rápido
+```
+
+**Alcance actual, decisión explícita**: clips cortos ya recortados en torno a un evento (los de
+`datasets/clips_analisis/`), NO partidos completos. `core/events.py` clasifica el clip **entero**
+como un solo evento (válido aquí porque ya viene recortado — sobre un partido de 90 min diluiría
+la señal, ver el propio docstring de ese módulo) y este módulo decodifica el clip entero a memoria
+(viable para clips de segundos, no para un partido completo). El troceado de un partido en
+clips/ventanas queda fuera de alcance por ahora.
+
+**Qué se ve en el vídeo final**:
+- Cajas + etiqueta coloreadas por equipo (o por `tracker_id` si no se pasa `--teams`), como en
+  `core/classification.py --annotated-output`.
+- Un contorno **amarillo** grueso sobre el poseedor del balón en cada frame, con `(POSESION)` en
+  su etiqueta.
+- Un banner superior semitransparente con el evento del clip (fijo durante todo el vídeo), p.ej.
+  `[EVENTO] shot (81%)` — o `[fondo] ...` si el clasificador determina que es un plano sin evento
+  real (ver taxonomía de `core/events.py`).
+- Un banner inferior con la última acción de balón clasificada (`[ACCION] Jugador #9: pass (77%)`),
+  que se actualiza en cada cambio de poseedor y persiste hasta el siguiente.
+
+✅ **Verificado visualmente en ejecución real** (17 jul 2026,
+`datasets/clips_analisis/shots_off_target/shotoff104.mp4`): las cuatro capas (equipo, posesión,
+acción, evento) renderizan correctamente y a la vez sobre el mismo frame. Nota de diseño
+verificada en el proceso: `sv.LabelAnnotator`/los banners de este módulo dibujan texto con
+`cv2.putText` (fuentes Hershey), que **no soporta emoji/Unicode fuera de Latin-1** — usar solo
+texto ASCII en cualquier etiqueta nueva (de ahí `(POSESION)` en vez de un emoji de balón).
+
+`telemetry.json` (`MatchTelemetry.to_telemetry()`):
+
+```json
+{
+  "source_video": "clip.mp4",
+  "event": {"label": "shot", "confidence": 0.81, "is_background": false, "probabilities": {}},
+  "ball_actions": [
+    {"frame_idx": 12, "tracker_id": 9, "label": "pass", "confidence": 0.77,
+     "probabilities": {}, "is_background": false}
+  ],
+  "n_frames": 75,
+  "n_possession_changes": 1
+}
+```
+
 ## Roadmap de desarrollo
 
 | Orden | Módulo | Descripción |
@@ -405,10 +467,10 @@ python -m core.ball_actions --source dataset_ball_actions/pass/algun_clip.mp4
 | 1 | `core/tracking.py` | ✅ Detección + tracking |
 | 2 | `core/classification.py` | ✅ Asignación de equipo (PRTReId + K-Means); dorsal (ViT OCR) queda pendiente |
 | 3 | `core/homography.py` | Keypoints del campo → matriz H (ver `Soccer_Master/sn_calibration` como referencia) |
-| 4 | `analytics/engine.py` | Métricas + `telemetry.json` |
+| 4 | `analytics/engine.py` | ✅ Composición final (equipo + posesión + acción de balón + evento) en un vídeo + `telemetry.json`, sobre clips cortos ya recortados; partidos completos quedan pendientes |
 | 5 | `core/events.py` | ✅ Clasificación de eventos (V-JEPA2 + SVC) sobre clips ya recortados; falta el troceado de partido completo → clips |
 | 6 | `utils/visualizers.py` | ✅ Vídeo anotado (`--annotated-output` en `core/tracking.py`); falta `main.py` (orquestación batch multi-módulo) |
-| 7 | `core/possession.py` / `core/ball_actions.py` | ✅ Poseedor del balón + clasificación Pass/Drive/High Pass/Header/Throw In/Background (R3D-18; Tackle/Cross/Ball Player Block diferidas, ver arriba); datos descargados y extraídos, falta entrenar |
+| 7 | `core/possession.py` / `core/ball_actions.py` | ✅ Poseedor del balón + clasificación Pass/Drive/High Pass/Header/Throw In/Background (R3D-18, ya entrenado y probado en ejecución real vía `analytics/engine.py`; Tackle/Cross/Ball Player Block diferidas, ver arriba) |
 | 8 | `orquestrator/agent.py` | Q&A semántico |
 | 9 | `automation/molmo_publisher.py` | Publicación RRSS |
 
@@ -619,6 +681,18 @@ vendorizada ni verificada end-to-end en este repo (ver el aviso al principio de 
 Puntero cruzado para quien llegue a depurar cualquiera de las tres: `torch`/`transformers`
 (pineados en `requirements.txt`, incidentes documentados arriba), `prtreid`/`bpbreid` (sin pin,
 esta sección), `PnLCalib` (sin vendorizar, docstring de `core/homography.py`).
+
+### A vigilar (no rompe todavía): `scikit-learn` sin techo y el `.joblib` de `core/events.py`
+
+Visto en `analytics/engine.py` (17 jul 2026), solo como warning, no error: `InconsistentVersionWarning:
+Trying to unpickle estimator ... from version 1.7.2 when using version 1.9.0`. El clasificador de
+eventos (`svc_classifier_more_penalties.joblib`) se serializó con scikit-learn 1.7.2; `requirements.txt`
+solo fija `scikit-learn>=1.4.0` (sin techo), así que un `docker build` en otro momento puede traer
+una versión bastante más nueva. Por ahora sigue funcionando (mismo patrón de riesgo que
+`transformers`/`prtreid` sin pin, todavía sin materializarse en rotura real) — si en algún momento
+`core/events.py` empieza a fallar al cargar el `.joblib`, o las predicciones se vuelven raras sin
+ningún error visible, fijar `scikit-learn==1.7.2` (o reentrenar/re-serializar el clasificador con
+la versión que esté instalada) es el primer sitio a mirar.
 
 ### Si algo se rompe otra vez tras un `docker build`
 

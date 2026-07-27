@@ -92,6 +92,19 @@ class ClassificationConfig:
 
 
 @dataclass(frozen=True)
+class AnalyticsConfig:
+    """Hiperparámetros de analytics/engine.py (composición final del pipeline).
+
+    Alcance actual: clips cortos ya recortados en torno a un evento (ver
+    docstring del módulo) — no partidos completos de 90 min.
+    """
+
+    max_possessor_distance_px: float = 150.0  # igual que possession.DEFAULT_MAX_DISTANCE_PX
+    hysteresis_frames: int = 10               # igual que possession.DEFAULT_HYSTERESIS_FRAMES
+    trace_length: int = 30                    # estela de trayectoria en el vídeo final
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     """Configuración raíz que main.py pasará a cada módulo."""
 
@@ -99,4 +112,5 @@ class PipelineConfig:
     events: EventsConfig = field(default_factory=EventsConfig)
     ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
     classification: ClassificationConfig = field(default_factory=ClassificationConfig)
+    analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
     outputs_dir: Path = OUTPUTS_DIR

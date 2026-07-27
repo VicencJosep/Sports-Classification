@@ -85,6 +85,10 @@ class TrackingVisualizer:
         )
         # El balón no tiene tracker_id ni equipo -> color fijo siempre.
         self._ball_annotator = sv.BoxAnnotator(color=sv.Color.WHITE, thickness=2)
+        # Resalte del poseedor del balón (core/possession.py): un contorno
+        # extra, grueso y de color fijo, DIBUJADO ENCIMA de la caja normal
+        # (por tracker_id o por equipo) — no sustituye a esa caja, la refuerza.
+        self._possessor_annotator = sv.BoxAnnotator(color=sv.Color.YELLOW, thickness=4)
 
     def annotate(
         self,
@@ -92,6 +96,7 @@ class TrackingVisualizer:
         detections: sv.Detections,
         ball_detections: sv.Detections,
         team_by_tracker_id: Optional[dict[int, int]] = None,
+        possessor_tracker_id: Optional[int] = None,
     ) -> np.ndarray:
         """Devuelve una COPIA anotada de ``frame`` (no lo modifica in-place).
 
@@ -100,6 +105,12 @@ class TrackingVisualizer:
         cajas/etiquetas/estela por EQUIPO (rojo/azul; gris para cualquier
         ``tracker_id`` no presente en el dict — árbitros, porteros, tracks
         excluidos) en vez de por ``tracker_id``.
+
+        Si se indica ``possessor_tracker_id`` (de
+        ``core/possession.py::resolve_possessor``/``iter_possession``) y ese
+        ``tracker_id`` está entre las detecciones de este frame, dibuja un
+        contorno amarillo extra sobre su caja — independiente del modo de
+        color (tracker_id o equipo).
         """
         annotated = frame.copy()
         persons = detections
@@ -130,11 +141,19 @@ class TrackingVisualizer:
                 scene=annotated, detections=persons, custom_color_lookup=custom_lookup
             )
             labels = [
-                self._person_label(persons, i, team_by_tracker_id) for i in range(len(persons))
+                self._person_label(persons, i, team_by_tracker_id, possessor_tracker_id)
+                for i in range(len(persons))
             ]
             annotated = label_annotator.annotate(
                 scene=annotated, detections=persons, labels=labels, custom_color_lookup=custom_lookup
             )
+
+            if possessor_tracker_id is not None:
+                possessor_mask = persons.tracker_id == possessor_tracker_id
+                if possessor_mask.any():
+                    annotated = self._possessor_annotator.annotate(
+                        scene=annotated, detections=persons[possessor_mask]
+                    )
 
         if len(ball_detections) > 0:
             annotated = self._ball_annotator.annotate(
@@ -145,7 +164,10 @@ class TrackingVisualizer:
 
     @staticmethod
     def _person_label(
-        persons: sv.Detections, idx: int, team_by_tracker_id: Optional[dict[int, int]]
+        persons: sv.Detections,
+        idx: int,
+        team_by_tracker_id: Optional[dict[int, int]],
+        possessor_tracker_id: Optional[int] = None,
     ) -> str:
         roles = persons.data.get("role", ["player"] * len(persons))
         jerseys = persons.data.get("jersey", [None] * len(persons))
@@ -167,6 +189,11 @@ class TrackingVisualizer:
 
         if jerseys[idx] is not None:
             label += f" ({jerseys[idx]})"
+        if possessor_tracker_id is not None and tracker_id == possessor_tracker_id:
+            # ASCII puro a propósito: sv.LabelAnnotator dibuja con cv2.putText
+            # (fuentes Hershey), que no soporta glifos Unicode fuera de
+            # Latin-1 -- un emoji tipo "⚽" saldría en blanco o roto.
+            label = f"(POSESION) {label}"
         return label
 
 
@@ -185,7 +212,7 @@ def _iter_tracks_jsonl(path: Path) -> Iterator[dict]:
                 yield json.loads(line)
 
 
-def _detections_from_record(record: dict) -> tuple[sv.Detections, sv.Detections]:
+def detections_from_record(record: dict) -> tuple[sv.Detections, sv.Detections]:
     """Reconstruye (personas, balón) como ``sv.Detections`` a partir de un
     registro de ``tracks.jsonl`` (formato ``FrameTrackingResult.
     to_telemetry()``) — para renderizar un vídeo anotado a partir de
@@ -276,7 +303,7 @@ def render_annotated_video(
                 if not ok:
                     break
 
-                persons, ball_dets = _detections_from_record(rec)
+                persons, ball_dets = detections_from_record(rec)
                 annotated = visualizer.annotate(frame, persons, ball_dets, team_by_tracker_id)
                 sink.write_frame(annotated)
                 frame_idx += 1

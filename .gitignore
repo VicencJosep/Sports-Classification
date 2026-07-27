@@ -49,3 +49,5 @@ Soccer_Master/SoccerMaster/models/deformable_detr/ops/functions/*
 
 Soccer_Master/SoccerMaster/models/deformable_detr/ops/modules/*
 !Soccer_Master/SoccerMaster/models/deformable_detr/ops/modules/ms_deform_attn.py
+
+yolo11x.pt
