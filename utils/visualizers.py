@@ -2,10 +2,10 @@
 utils/visualizers.py
 =====================
 Anotadores gráficos (roboflow/supervision) para dibujar sobre el frame
-original los resultados de ``core.tracking.PlayerTracker``: cajas + etiqueta
-(ID de tracking, rol, dorsal) coloreadas por ``tracker_id`` (cada jugador
-conserva su color entre frames), estela de trayectoria por jugador, y una
-marca aparte para el balón.
+original los resultados de ``core.tracking.PlayerTracker``: una elipse en los
+pies + etiqueta compacta (número de dorsal o ID de tracking) coloreadas por
+``tracker_id`` (cada jugador conserva su color entre frames), estela de
+trayectoria por jugador, y una marca aparte para el balón.
 
 También soporta colorear por EQUIPO en vez de por ``tracker_id`` (rojo/azul,
 gris para quien no tenga equipo asignado), usando el resultado de
@@ -43,13 +43,48 @@ import supervision as sv
 # core/classification.py — ver TeamClusteringResult.excluded).
 _TEAM_PALETTE: sv.ColorPalette = sv.ColorPalette(colors=[sv.Color.RED, sv.Color.BLUE, sv.Color.GREY])
 _TEAM_UNASSIGNED_IDX: int = 2
-_TEAM_LABELS: dict[int, str] = {0: "Equipo 0", 1: "Equipo 1"}
 
-# class_id placeholder para el balón: BoxAnnotator con color_lookup=CLASS (su
-# default) exige que class_id no sea None, pero aquí el balón siempre se
+# class_id placeholder para el balón: los annotators con color_lookup=CLASS
+# (su default) exigen que class_id no sea None, pero aquí el balón siempre se
 # pinta con un color FIJO (sv.Color.WHITE, no una paleta), así que el valor
 # concreto es irrelevante -- ver TrackingVisualizer._ball_annotator.
 _BALL_CLASS_ID_PLACEHOLDER: int = 0
+
+# Paleta de color por tipo de evento/acción (core/events.py + core/ball_actions.py),
+# COMPARTIDA entre el resalte de jugador/balón (TrackingVisualizer.annotate) y las
+# tarjetas de notificación (analytics/engine.py::render_match_video) -- un mismo
+# color significa lo mismo en todo el vídeo, sea cual sea la fuente. Claves
+# normalizadas con "-" (action_color() también acepta "_", así que "throw_in" de
+# core/ball_actions.py y "throw-in" de core/events.py comparten entrada: son el
+# mismo concepto real visto por dos clasificadores distintos). Huecos de matiz
+# (~45-75°) reservados a propósito para no confundirse con el amarillo del
+# resalte de poseedor (TrackingVisualizer._possessor_annotator).
+ACTION_COLORS: dict[str, sv.Color] = {
+    "goal": sv.Color(242, 36, 108),
+    "shot": sv.Color(242, 126, 36),
+    "penalty": sv.Color(242, 43, 36),
+    "card": sv.Color(215, 36, 242),
+    "corner": sv.Color(36, 180, 242),
+    "foul": sv.Color(132, 36, 242),
+    "kick-off": sv.Color(36, 242, 60),
+    "substitution": sv.Color(53, 36, 242),
+    "throw-in": sv.Color(36, 242, 222),
+    "pass": sv.Color(36, 102, 242),
+    "drive": sv.Color(91, 242, 36),
+    "header": sv.Color(174, 242, 36),
+    "high-pass": sv.Color(36, 242, 143),
+}
+DEFAULT_ACTION_COLOR: sv.Color = sv.Color(190, 190, 190)  # gris, para etiquetas no mapeadas
+
+
+def action_color(label: Optional[str]) -> sv.Color:
+    """Color asociado a una etiqueta de evento/acción (ver ACTION_COLORS) --
+    gris (DEFAULT_ACTION_COLOR) si la etiqueta es None o no está en la paleta
+    (p.ej. una clase nueva de un checkpoint futuro que aún no se ha añadido
+    aquí)."""
+    if label is None:
+        return DEFAULT_ACTION_COLOR
+    return ACTION_COLORS.get(label.replace("_", "-"), DEFAULT_ACTION_COLOR)
 
 
 class TrackingVisualizer:
@@ -60,9 +95,13 @@ class TrackingVisualizer:
     """
 
     def __init__(self, trace_length: int = 30) -> None:
-        self._box_annotator = sv.BoxAnnotator(color_lookup=sv.ColorLookup.TRACK)
+        # Elipse en los pies en vez de caja alrededor del cuerpo: mismo peso
+        # informativo (color por tracker_id/equipo), mucho menos ruido visual
+        # con 20+ jugadores en pantalla (estilo estándar de broadcast).
+        self._box_annotator = sv.EllipseAnnotator(color_lookup=sv.ColorLookup.TRACK, thickness=2)
         self._label_annotator = sv.LabelAnnotator(
-            color_lookup=sv.ColorLookup.TRACK, text_position=sv.Position.TOP_LEFT,
+            color_lookup=sv.ColorLookup.TRACK, text_position=sv.Position.TOP_CENTER,
+            text_scale=0.4, text_padding=3,
             smart_position=True,  # separa etiquetas solapadas (jugadores muy juntos)
         )
         self._trace_annotator = (
@@ -74,9 +113,10 @@ class TrackingVisualizer:
         # se fija en el constructor de cada annotator (aquí _TEAM_PALETTE),
         # no se puede compartir instancia con los de arriba (paleta genérica
         # por tracker_id) y solo cambiar el índice de color en cada llamada.
-        self._team_box_annotator = sv.BoxAnnotator(color=_TEAM_PALETTE)
+        self._team_box_annotator = sv.EllipseAnnotator(color=_TEAM_PALETTE, thickness=2)
         self._team_label_annotator = sv.LabelAnnotator(
-            color=_TEAM_PALETTE, text_position=sv.Position.TOP_LEFT, smart_position=True,
+            color=_TEAM_PALETTE, text_position=sv.Position.TOP_CENTER,
+            text_scale=0.4, text_padding=3, smart_position=True,
         )
         self._team_trace_annotator = (
             sv.TraceAnnotator(trace_length=trace_length, color=_TEAM_PALETTE)
@@ -84,11 +124,18 @@ class TrackingVisualizer:
             else None
         )
         # El balón no tiene tracker_id ni equipo -> color fijo siempre.
-        self._ball_annotator = sv.BoxAnnotator(color=sv.Color.WHITE, thickness=2)
-        # Resalte del poseedor del balón (core/possession.py): un contorno
-        # extra, grueso y de color fijo, DIBUJADO ENCIMA de la caja normal
-        # (por tracker_id o por equipo) — no sustituye a esa caja, la refuerza.
-        self._possessor_annotator = sv.BoxAnnotator(color=sv.Color.YELLOW, thickness=4)
+        # Triángulo en vez de caja: un objeto de ~8px se distingue mejor con
+        # una marca sólida y pequeña que con el contorno de una caja fina.
+        self._ball_annotator = sv.TriangleAnnotator(color=sv.Color.WHITE, base=14, height=14)
+        # Resalte del poseedor del balón (core/possession.py): ya no es una
+        # segunda caja superpuesta -- con elipse basta con engrosar la MISMA
+        # forma en amarillo, sin apilar dos anotadores distintos por encima.
+        self._possessor_annotator = sv.EllipseAnnotator(color=sv.Color.YELLOW, thickness=4)
+        # No hay un anotador fijo para el resalte de acción/evento (a diferencia
+        # del de poseedor, siempre amarillo): su color depende de la etiqueta
+        # (ver ACTION_COLORS/action_color), así que se construye al vuelo en
+        # annotate() -- construir un EllipseAnnotator/TriangleAnnotator es barato
+        # (solo guarda parámetros, no carga ningún modelo).
 
     def annotate(
         self,
@@ -97,20 +144,33 @@ class TrackingVisualizer:
         ball_detections: sv.Detections,
         team_by_tracker_id: Optional[dict[int, int]] = None,
         possessor_tracker_id: Optional[int] = None,
+        highlight_tracker_id: Optional[int] = None,
+        highlight_label: Optional[str] = None,
     ) -> np.ndarray:
         """Devuelve una COPIA anotada de ``frame`` (no lo modifica in-place).
 
         Si se indica ``team_by_tracker_id`` (``{tracker_id: team_cluster}``,
         de ``core/classification.py::TeamClusteringResult.teams``), colorea
-        cajas/etiquetas/estela por EQUIPO (rojo/azul; gris para cualquier
+        elipses/etiquetas/estela por EQUIPO (rojo/azul; gris para cualquier
         ``tracker_id`` no presente en el dict — árbitros, porteros, tracks
         excluidos) en vez de por ``tracker_id``.
 
         Si se indica ``possessor_tracker_id`` (de
         ``core/possession.py::resolve_possessor``/``iter_possession``) y ese
-        ``tracker_id`` está entre las detecciones de este frame, dibuja un
-        contorno amarillo extra sobre su caja — independiente del modo de
-        color (tracker_id o equipo).
+        ``tracker_id`` está entre las detecciones de este frame, engruesa su
+        elipse en amarillo — independiente del modo de color (tracker_id o
+        equipo).
+
+        Si se indica ``highlight_tracker_id`` (jugador implicado en una acción
+        de balón reciente, o — a falta de eso — el poseedor en el momento de
+        un evento; ver ``analytics/engine.py::render_match_video``) junto con
+        ``highlight_label`` (la etiqueta de esa acción/evento, p.ej. "pass",
+        "shot"...), su elipse y etiqueta se resaltan con el color asociado a
+        esa etiqueta (``ACTION_COLORS``/``action_color``) — más prioritario
+        que el amarillo de posesión si ambos coinciden, porque es una señal
+        más específica y efímera (dura unos pocos frames, no "hasta la
+        siguiente"). El balón recibe ese mismo color mientras el resalte esté
+        activo (en vez del blanco de costumbre), con un marcador más grande.
         """
         annotated = frame.copy()
         persons = detections
@@ -148,17 +208,35 @@ class TrackingVisualizer:
                 scene=annotated, detections=persons, labels=labels, custom_color_lookup=custom_lookup
             )
 
-            if possessor_tracker_id is not None:
-                possessor_mask = persons.tracker_id == possessor_tracker_id
-                if possessor_mask.any():
-                    annotated = self._possessor_annotator.annotate(
-                        scene=annotated, detections=persons[possessor_mask]
-                    )
+            if highlight_tracker_id is not None and (persons.tracker_id == highlight_tracker_id).any():
+                mask = persons.tracker_id == highlight_tracker_id
+                color = action_color(highlight_label)
+                annotated = sv.EllipseAnnotator(color=color, thickness=4).annotate(
+                    scene=annotated, detections=persons[mask]
+                )
+                idx = int(np.nonzero(mask)[0][0])
+                annotated = sv.LabelAnnotator(
+                    color=color, text_position=sv.Position.TOP_CENTER,
+                    text_scale=0.4, text_padding=3,
+                ).annotate(
+                    scene=annotated, detections=persons[mask],
+                    labels=[self._person_label(persons, idx, team_by_tracker_id, possessor_tracker_id)],
+                )
+            elif possessor_tracker_id is not None and (persons.tracker_id == possessor_tracker_id).any():
+                mask = persons.tracker_id == possessor_tracker_id
+                annotated = self._possessor_annotator.annotate(
+                    scene=annotated, detections=persons[mask]
+                )
 
         if len(ball_detections) > 0:
-            annotated = self._ball_annotator.annotate(
-                scene=annotated, detections=ball_detections
-            )
+            if highlight_label is not None:
+                ball_annotator = sv.TriangleAnnotator(
+                    color=action_color(highlight_label), base=22, height=22,
+                    outline_thickness=2, outline_color=sv.Color.WHITE,
+                )
+            else:
+                ball_annotator = self._ball_annotator
+            annotated = ball_annotator.annotate(scene=annotated, detections=ball_detections)
 
         return annotated
 
@@ -173,28 +251,80 @@ class TrackingVisualizer:
         jerseys = persons.data.get("jersey", [None] * len(persons))
         tracker_id = int(persons.tracker_id[idx])
         role = roles[idx]
+        # El dorsal real es más legible que el tracker_id interno cuando existe.
+        number = jerseys[idx] if jerseys[idx] is not None else tracker_id
 
         if team_by_tracker_id is not None:
             team = team_by_tracker_id.get(tracker_id)
-            # Con equipo asignado, "player" es redundante con el color -> se omite
-            # para dejar sitio en escenas con muchos jugadores muy juntos (córners,
-            # áreas...). Sin equipo (árbitro/portero/excluido) sí interesa el rol.
-            label = (
-                f"#{tracker_id} · {_TEAM_LABELS[team]}"
-                if team is not None
-                else f"#{tracker_id} {role} · sin equipo"
-            )
+            # Con equipo asignado, el color ya identifica el equipo -> la
+            # etiqueta se reduce al número, sin repetir "Equipo N" en texto.
+            # Sin equipo (árbitro/portero/excluido) sí interesa el rol, porque
+            # el gris no distingue por sí solo estos casos.
+            label = str(number) if team is not None else f"{number} {role}"
         else:
-            label = f"#{tracker_id} {role}"
+            label = f"{number} {role}"
 
-        if jerseys[idx] is not None:
-            label += f" ({jerseys[idx]})"
         if possessor_tracker_id is not None and tracker_id == possessor_tracker_id:
             # ASCII puro a propósito: sv.LabelAnnotator dibuja con cv2.putText
             # (fuentes Hershey), que no soporta glifos Unicode fuera de
             # Latin-1 -- un emoji tipo "⚽" saldría en blanco o roto.
-            label = f"(POSESION) {label}"
+            label = f"* {label}"
         return label
+
+
+def draw_notification_card(
+    frame: np.ndarray,
+    title: str,
+    subtitle: str,
+    color: sv.Color,
+    top_left: tuple[int, int] = (14, 14),
+    width: int = 300,
+    height: int = 64,
+) -> np.ndarray:
+    """Tarjeta de notificación estilo "toast" (sombra + fondo semitransparente
+    + barra lateral de color + icono + título/subtítulo en dos líneas) sobre
+    una esquina de ``frame`` -- pensada para eventos/acciones reconocidos, en
+    vez de una franja a todo lo ancho del vídeo.
+
+    Sin animación real (se dibuja igual en cada frame que se pida) ni iconos
+    Unicode/emoji reales: ``cv2.putText`` dibuja con fuentes Hershey, que no
+    soportan esos glifos (saldrían en blanco o rotos, ver ``_person_label``) —
+    el "icono" es un círculo relleno del color de la notificación con un
+    borde blanco fino, no un emoji.
+
+    Genérica y sin conocer eventos/acciones (igual que el resto de este
+    módulo) -- el contenido concreto (qué título/subtítulo/color mostrar en
+    cada frame) es responsabilidad de ``analytics/engine.py::render_match_video``.
+    """
+    x, y = top_left
+    bgr = (color.b, color.g, color.r)  # sv.Color es RGB; cv2 dibuja en BGR
+    out = frame.copy()
+
+    # Sombra ("profundidad"): mismo rectángulo desplazado, oscuro y semitransparente.
+    shadow_offset = 5
+    overlay = out.copy()
+    cv2.rectangle(
+        overlay, (x + shadow_offset, y + shadow_offset),
+        (x + width + shadow_offset, y + height + shadow_offset), (0, 0, 0), -1,
+    )
+    out = cv2.addWeighted(overlay, 0.35, out, 0.65, 0)
+
+    # Fondo de la tarjeta.
+    overlay = out.copy()
+    cv2.rectangle(overlay, (x, y), (x + width, y + height), (25, 25, 25), -1)
+    out = cv2.addWeighted(overlay, 0.72, out, 0.28, 0)
+
+    # Barra lateral + icono (círculo) del color de la notificación.
+    cv2.rectangle(out, (x, y), (x + 6, y + height), bgr, -1)
+    icon_center = (x + 27, y + height // 2)
+    cv2.circle(out, icon_center, 12, bgr, -1)
+    cv2.circle(out, icon_center, 12, (255, 255, 255), 1, cv2.LINE_AA)
+
+    text_x = x + 48
+    cv2.putText(out, title, (text_x, y + 28), cv2.FONT_HERSHEY_SIMPLEX, 0.64, (255, 255, 255), 2, cv2.LINE_AA)
+    cv2.putText(out, subtitle, (text_x, y + 50), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (215, 215, 215), 1, cv2.LINE_AA)
+
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -250,7 +380,7 @@ def render_annotated_video(
     team_by_tracker_id: Optional[dict[int, int]] = None,
     trace_length: int = 30,
 ) -> None:
-    """Segunda pasada (post-hoc) sobre un vídeo ya trackeado: dibuja cajas,
+    """Segunda pasada (post-hoc) sobre un vídeo ya trackeado: dibuja elipses,
     etiquetas y estelas sobre cada frame a partir de ``tracks_jsonl_path``
     (de ``core/tracking.py``) y escribe un ``.mp4`` anotado — sin volver a
     correr el detector, solo decodifica el vídeo original.

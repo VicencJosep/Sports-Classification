@@ -516,16 +516,27 @@ class PlayerTracker:
         track_activation_threshold: float = 0.25,
         lost_track_buffer: int = 30,
         minimum_matching_threshold: float = 0.8,
-        frame_rate: int = 30,
+        frame_rate: Optional[int] = None,
     ) -> None:
         self.detector = detector
         self.confidence = confidence
         self.ball_confidence = ball_confidence
         self.min_box_area = min_box_area
-        self.tracker = sv.ByteTrack(
-            track_activation_threshold=track_activation_threshold,
-            lost_track_buffer=lost_track_buffer,
-            minimum_matching_threshold=minimum_matching_threshold,
+        self._track_activation_threshold = track_activation_threshold
+        self._lost_track_buffer = lost_track_buffer
+        self._minimum_matching_threshold = minimum_matching_threshold
+        # frame_rate=None -> auto-detectar del vídeo real en process_video() (evita
+        # el desfase silencioso de usar un frame_rate nominal distinto al real del
+        # vídeo al dimensionar lost_track_buffer). Si se pasa explícito, se respeta
+        # tal cual (p.ej. para process_batch() standalone sin pasar por process_video()).
+        self._frame_rate = frame_rate
+        self.tracker = self._build_tracker(frame_rate or 30)
+
+    def _build_tracker(self, frame_rate: int) -> sv.ByteTrack:
+        return sv.ByteTrack(
+            track_activation_threshold=self._track_activation_threshold,
+            lost_track_buffer=self._lost_track_buffer,
+            minimum_matching_threshold=self._minimum_matching_threshold,
             frame_rate=frame_rate,
         )
 
@@ -614,7 +625,13 @@ class PlayerTracker:
         source = str(source_path)
         video_info = sv.VideoInfo.from_video_path(source)
         fps = float(video_info.fps or 30)
-        self.tracker.reset()
+        if self._frame_rate is None:
+            # Reconstruye con el fps real del vídeo (p.ej. 25 en SoccerNet) en vez
+            # del fallback de 30 usado en __init__ antes de conocerlo — evita que
+            # lost_track_buffer represente una duración real distinta a la prevista.
+            self.tracker = self._build_tracker(round(fps))
+        else:
+            self.tracker.reset()
 
         logger.info(
             "Procesando %s — %dx%d @ %.1f fps, %s frames (chunk=%d, stride=%d)",
@@ -729,6 +746,37 @@ def build_detector(
     )
 
 
+def ensure_tracking(video_path: Path, detector_name: str = "hybrid", device: Optional[str] = None) -> Path:
+    """Corre PlayerTracker sobre video_path si tracks.jsonl no existe ya (caché).
+
+    Escribe primero a un ``.tmp`` y solo renombra al fichero final si termina
+    sin errores — si un intento previo se cortó a mitad (crash/OOM/Ctrl-C), el
+    ``.tmp`` queda huérfano pero NUNCA aparenta ser una caché completa, así que
+    la siguiente ejecución vuelve a generarla en vez de reutilizar un JSONL
+    vacío o a medias (ver incidente: un crash de HybridDetector dejó un
+    tracks.jsonl de 0 bytes que esta función daba por bueno, produciendo 0
+    clips en todas las extracciones posteriores sin ningún error visible).
+
+    Usado tanto por scripts/extract_ball_action_clips.py (extracción offline de
+    clips de entrenamiento) como por analytics/engine.py::analyze_full_match
+    (Pase A del flujo de partido completo) — la misma caché sirve para ambos.
+    """
+    tracks_path = video_path.with_suffix(".tracks.jsonl")
+    if tracks_path.exists():
+        logger.info("tracks.jsonl ya existe, reutilizando: %s", tracks_path)
+        return tracks_path
+
+    logger.info("Corriendo core.tracking (%s) sobre %s ...", detector_name, video_path)
+    detector = build_detector(detector_name, device=device)
+    tracker = PlayerTracker(detector=detector)
+    tmp_path = tracks_path.with_suffix(tracks_path.suffix + ".tmp")
+    with open(tmp_path, "w") as f:
+        for result in tracker.process_video(video_path):
+            f.write(json.dumps(result.to_telemetry()) + "\n")
+    tmp_path.rename(tracks_path)
+    return tracks_path
+
+
 def main() -> None:
     import argparse
     from contextlib import ExitStack
@@ -749,6 +797,11 @@ def main() -> None:
     parser.add_argument("--device", default=None)
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--max-frames", type=int, default=None)
+    parser.add_argument(
+        "--frame-rate", type=int, default=None,
+        help="fps nominal para ByteTrack (lost_track_buffer). Por defecto (sin "
+             "indicar), se auto-detecta del vídeo real en process_video().",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -759,7 +812,7 @@ def main() -> None:
         yolo_model_path=args.yolo_model,
         sm_repo_dir=args.sm_dir,
     )
-    tracker = PlayerTracker(detector=detector)
+    tracker = PlayerTracker(detector=detector, frame_rate=args.frame_rate)
 
     with ExitStack() as stack:
         f = stack.enter_context(open(args.output, "w"))

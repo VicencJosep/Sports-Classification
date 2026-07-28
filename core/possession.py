@@ -114,6 +114,37 @@ def iter_possession(
         yield out_record
 
 
+def ensure_possession(
+    tracks_path: Path,
+    max_distance_px: float = DEFAULT_MAX_DISTANCE_PX,
+    hysteresis_frames: int = DEFAULT_HYSTERESIS_FRAMES,
+) -> Path:
+    """Corre iter_possession sobre tracks_path si el possession.jsonl no existe ya.
+
+    Misma escritura atómica (``.tmp`` + rename) que ``core.tracking.
+    ensure_tracking``, por el mismo motivo: un corte a mitad no debe dejar una
+    caché parcial que una ejecución posterior reutilice como si fuera válida.
+
+    Usado tanto por scripts/extract_ball_action_clips.py (que no pasa
+    ``hysteresis_frames``, así que sigue usando el default de siempre) como por
+    analytics/engine.py::analyze_full_match (Pase B del flujo de partido
+    completo, que sí puede querer ajustarlo).
+    """
+    possession_path = tracks_path.with_suffix("").with_suffix(".possession.jsonl")
+    if possession_path.exists():
+        logger.info("possession.jsonl ya existe, reutilizando: %s", possession_path)
+        return possession_path
+
+    tmp_path = possession_path.with_suffix(possession_path.suffix + ".tmp")
+    with open(tmp_path, "w") as f:
+        for record in iter_possession(
+            tracks_path, max_distance_px=max_distance_px, hysteresis_frames=hysteresis_frames
+        ):
+            f.write(json.dumps(record) + "\n")
+    tmp_path.rename(possession_path)
+    return possession_path
+
+
 # --------------------------------------------------------------------------- #
 #  Ejecución standalone
 # --------------------------------------------------------------------------- #

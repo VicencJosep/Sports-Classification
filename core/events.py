@@ -17,13 +17,19 @@ distingue shots_on_target/shots_off_target ni yellow/red card): se fusionaron
 a propósito porque esa frontera era difusa para el modelo y perjudicaba la
 precisión.
 
-Importante: ``sample_frames`` muestrea NUM_FRAMES frames uniformemente a lo
-largo de TODA la duración del vídeo de entrada. Este módulo asume que el
-``.mp4`` de entrada ya es un CLIP recortado en torno a un único evento (unos
-pocos segundos), como los de ``clips_analisis/``. Pasarle un partido completo
-sin trocear diluye la señal del evento entre 90 minutos y no producirá una
-predicción útil; el troceado (sliding window / detección de escenas) es
-responsabilidad de una capa superior (``analytics/engine.py`` o ``main.py``).
+Importante: ``sample_frames``/``predict()`` muestrean NUM_FRAMES frames
+uniformemente a lo largo de TODA la duración del vídeo de entrada, y asumen
+que ``video_path`` ya es un CLIP recortado en torno a un único evento (unos
+pocos segundos), como los de ``clips_analisis/`` — pasarles un partido
+completo sin trocear diluye la señal del evento entre 90 minutos y no produce
+una predicción útil. Para partidos completos, usar en su lugar
+``sample_frames_window``/``predict_window()``, que clasifican solo una
+ventana ``[start_s, end_s]`` sin decodificar el vídeo entero; el troceado en
+ventana deslizante vive en ``core/windowing.py`` y se orquesta desde
+``analytics/engine.py::analyze_full_match``. Los clips de entrenamiento del
+SVC duran ~6.0s reales (ver ``config.EventsConfig.window_s``) — las ventanas
+de inferencia deben cubrir esa misma duración real, no solo NUM_FRAMES crudos,
+o hay riesgo de distribution-shift frente al entrenamiento.
 
 Uso rápido (standalone, desde la raíz del proyecto):
     python -m core.events --source clip.mp4
@@ -78,8 +84,24 @@ class EventPrediction:
         return asdict(self)
 
 
+def _uniform_sample_by_time(
+    decoded: list[tuple[float, np.ndarray]], start_s: float, end_s: float, n: int
+) -> list[np.ndarray]:
+    """De una lista (timestamp, frame) ya decodificada, escoge n frames
+    muestreados uniformemente por TIEMPO en [start_s, end_s] (el frame
+    decodificado más cercano, por timestamp, a cada punto de muestreo)."""
+    target_times = np.linspace(start_s, end_s, num=n)
+    decoded_times = np.array([t for t, _ in decoded])
+    return [decoded[int(np.argmin(np.abs(decoded_times - tt)))][1] for tt in target_times]
+
+
 def sample_frames(video_path: Path, n: int = DEFAULT_NUM_FRAMES) -> list[np.ndarray]:
-    """Extrae n frames RGB muestreados uniformemente por timestamp (0 -> duración)."""
+    """Extrae n frames RGB muestreados uniformemente por timestamp (0 -> duración).
+
+    Decodifica el contenedor ENTERO — viable para clips cortos ya recortados
+    (uso previsto de esta función), no para un partido completo. Para eso,
+    usar ``sample_frames_window`` (busca/decodifica solo la ventana pedida).
+    """
     import av
 
     container = av.open(str(video_path))
@@ -102,8 +124,6 @@ def sample_frames(video_path: Path, n: int = DEFAULT_NUM_FRAMES) -> list[np.ndar
             duration = float(last_pts * tb)
             container.seek(0)
 
-        target_times = np.linspace(0.0, duration, num=n)
-
         decoded: list[tuple[float, np.ndarray]] = []
         for frame in container.decode(video=0):
             if frame.pts is None:
@@ -115,9 +135,50 @@ def sample_frames(video_path: Path, n: int = DEFAULT_NUM_FRAMES) -> list[np.ndar
     if not decoded:
         raise ValueError(f"No se pudo decodificar ningún frame de {video_path}")
 
-    decoded_times = np.array([t for t, _ in decoded])
-    frames = [decoded[int(np.argmin(np.abs(decoded_times - tt)))][1] for tt in target_times]
-    return frames
+    return _uniform_sample_by_time(decoded, 0.0, duration, n)
+
+
+def sample_frames_window(
+    video_path: Path, start_s: float, end_s: float, n: int = DEFAULT_NUM_FRAMES
+) -> list[np.ndarray]:
+    """Como ``sample_frames``, pero solo sobre la ventana ``[start_s, end_s]``
+    de ``video_path``, SIN decodificar el vídeo entero: hace seek al keyframe
+    anterior a ``start_s`` y decodifica hacia delante hasta superar ``end_s``.
+
+    Pensada para partidos completos (``analytics/engine.py::
+    analyze_full_match``, ventana deslizante vía ``core/windowing.py``): acota
+    el coste a "retroceso de GOP + duración de la ventana" en vez de al vídeo
+    completo. ``sample_frames`` sigue existiendo tal cual para el flujo de
+    clip corto.
+    """
+    import av
+
+    container = av.open(str(video_path))
+    try:
+        stream = container.streams.video[0]
+        tb = stream.time_base
+
+        container.seek(int(start_s / tb), stream=stream, backward=True, any_frame=False)
+
+        decoded: list[tuple[float, np.ndarray]] = []
+        for frame in container.decode(video=0):
+            if frame.pts is None:
+                continue
+            ts = float(frame.pts * tb)
+            if ts < start_s:
+                continue  # el seek aterriza en el keyframe anterior, puede ser < start_s
+            if ts > end_s:
+                break
+            decoded.append((ts, frame.to_ndarray(format="rgb24")))
+    finally:
+        container.close()
+
+    if not decoded:
+        raise ValueError(
+            f"No se pudo decodificar ningún frame de {video_path} en [{start_s}, {end_s}]"
+        )
+
+    return _uniform_sample_by_time(decoded, start_s, end_s, n)
 
 
 # --------------------------------------------------------------------------- #
@@ -174,9 +235,29 @@ class EventClassifier:
     # ------------------------------------------------------------------ #
 
     def predict(self, video_path: Path | str) -> EventPrediction:
-        """Clasifica un único clip .mp4. Lanza excepción si no se puede leer/procesar."""
+        """Clasifica un único clip .mp4 entero. Lanza excepción si no se puede leer/procesar."""
         video_path = Path(video_path)
         frames = sample_frames(video_path, self.num_frames)
+        return self._predict_from_frames(str(video_path), frames)
+
+    def predict_window(
+        self, video_path: Path | str, start_s: float, end_s: float
+    ) -> EventPrediction:
+        """Clasifica solo la ventana ``[start_s, end_s]`` de ``video_path``
+        (partido completo, ventana deslizante — ver ``core/windowing.py``),
+        sin decodificar el vídeo entero (``sample_frames_window``).
+
+        ``EventPrediction.video_path`` sigue siendo la ruta del vídeo fuente;
+        la ventana concreta la lleva el ``Window`` del llamador
+        (``analytics/engine.py::analyze_full_match``), no esta predicción.
+        """
+        video_path = Path(video_path)
+        frames = sample_frames_window(video_path, start_s, end_s, self.num_frames)
+        return self._predict_from_frames(str(video_path), frames)
+
+    def _predict_from_frames(
+        self, video_path_label: str, frames: list[np.ndarray]
+    ) -> EventPrediction:
         embedding = self._embed(frames)
 
         probs = self.clf.predict_proba(embedding.reshape(1, -1))[0]
@@ -187,7 +268,7 @@ class EventClassifier:
         }
 
         return EventPrediction(
-            video_path=str(video_path),
+            video_path=video_path_label,
             label=label,
             confidence=float(probs[pred_idx]),
             probabilities=probabilities,

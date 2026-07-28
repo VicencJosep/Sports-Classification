@@ -56,8 +56,8 @@ import cv2
 import numpy as np
 
 from core.ball_actions import compute_crop_box
-from core.possession import DEFAULT_MAX_DISTANCE_PX, iter_possession
-from core.tracking import PlayerTracker, build_detector
+from core.possession import DEFAULT_MAX_DISTANCE_PX, ensure_possession, iter_possession
+from core.tracking import ensure_tracking
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ def _is_main_camera(label: str) -> bool:
 
 
 # --------------------------------------------------------------------------- #
-#  Tracking + posesión (con caché en disco junto al vídeo)
+#  Localización de vídeo por mitad
 # --------------------------------------------------------------------------- #
 
 def _find_half_video(match_dir: Path, half: int) -> Path:
@@ -162,50 +162,6 @@ def _find_half_video(match_dir: Path, half: int) -> Path:
         f"No encuentro el vídeo de la mitad {half} en {match_dir} "
         f"(probado: {[p.format(half=half) for p in _HALF_VIDEO_CANDIDATES]})"
     )
-
-
-def ensure_tracking(video_path: Path, detector_name: str = "hybrid", device: Optional[str] = None) -> Path:
-    """Corre core.tracking sobre video_path si tracks.jsonl no existe ya (caché).
-
-    Escribe primero a un ``.tmp`` y solo renombra al fichero final si termina
-    sin errores — si un intento previo se cortó a mitad (crash/OOM/Ctrl-C), el
-    ``.tmp`` queda huérfano pero NUNCA aparenta ser una caché completa, así que
-    la siguiente ejecución vuelve a generarla en vez de reutilizar un JSONL
-    vacío o a medias (ver incidente: un crash de HybridDetector dejó un
-    tracks.jsonl de 0 bytes que esta función daba por bueno, produciendo 0
-    clips en todas las extracciones posteriores sin ningún error visible).
-    """
-    tracks_path = video_path.with_suffix(".tracks.jsonl")
-    if tracks_path.exists():
-        logger.info("tracks.jsonl ya existe, reutilizando: %s", tracks_path)
-        return tracks_path
-
-    logger.info("Corriendo core.tracking (%s) sobre %s ...", detector_name, video_path)
-    detector = build_detector(detector_name, device=device)
-    tracker = PlayerTracker(detector=detector)
-    tmp_path = tracks_path.with_suffix(tracks_path.suffix + ".tmp")
-    with open(tmp_path, "w") as f:
-        for result in tracker.process_video(video_path):
-            f.write(json.dumps(result.to_telemetry()) + "\n")
-    tmp_path.rename(tracks_path)
-    return tracks_path
-
-
-def ensure_possession(tracks_path: Path, max_distance_px: float = DEFAULT_MAX_DISTANCE_PX) -> Path:
-    """Igual que ensure_tracking: escritura atómica (.tmp + rename) para que un
-    corte a mitad no deje una caché parcial que se reutilice como si fuera
-    válida."""
-    possession_path = tracks_path.with_suffix("").with_suffix(".possession.jsonl")
-    if possession_path.exists():
-        logger.info("possession.jsonl ya existe, reutilizando: %s", possession_path)
-        return possession_path
-
-    tmp_path = possession_path.with_suffix(possession_path.suffix + ".tmp")
-    with open(tmp_path, "w") as f:
-        for record in iter_possession(tracks_path, max_distance_px=max_distance_px):
-            f.write(json.dumps(record) + "\n")
-    tmp_path.rename(possession_path)
-    return possession_path
 
 
 def _load_records_by_frame(jsonl_path: Path) -> dict[int, dict]:

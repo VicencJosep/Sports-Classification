@@ -4,21 +4,27 @@ analytics/engine.py
 Composición final del pipeline: une ``tracks.jsonl`` (``core/tracking.py``) +
 ``teams.json`` (``core/classification.py``) + posesión (``core/possession.py``,
 calculada aquí) + predicciones de ``core/ball_actions.py`` (una por cambio de
-posesión) + ``core/events.py`` (una por clip) en un único vídeo anotado y un
-``telemetry.json``.
+posesión) + ``core/events.py`` en un único vídeo anotado y un ``telemetry.json``.
 
-Alcance actual (decisión explícita — ver README § "Uso — composición final"):
-CLIPS CORTOS ya recortados en torno a un evento, como los de
-``datasets/clips_analisis/``, NO partidos completos de 90 min.
-  - ``core/events.py`` clasifica el clip ENTERO como un solo evento — válido
-    aquí porque el clip ya viene recortado; sobre un partido completo diluiría
-    la señal (ver el propio docstring de ese módulo).
-  - Este módulo decodifica el clip ENTERO a memoria (``_read_all_frames``) —
-    viable para clips de segundos, NO para un partido completo.
-El troceado de un partido completo en clips/ventanas queda fuera de alcance,
-tal como ya lo estaba en ``core/events.py``.
+Dos flujos, cada uno con su función de análisis (el render se comparte):
 
-Pipeline:
+* ``analyze_match`` (sin cambios respecto a la versión clip-corto original):
+  CLIPS CORTOS ya recortados en torno a un evento, como los de
+  ``datasets/clips_analisis/``. ``core/events.py`` clasifica el clip ENTERO
+  como un solo evento (válido porque el clip ya viene recortado) y este módulo
+  decodifica el clip entero a memoria (``_read_all_frames``) — viable para
+  clips de segundos, no para un partido completo.
+* ``analyze_full_match`` (nuevo): partidos completos de ~90 min. Pase A
+  (tracking, cacheado vía ``core.tracking.ensure_tracking``) + Pase B
+  (posesión + acciones de balón, streaming con buffer de frames ACOTADO —
+  ``_analyze_possession_and_ball_actions``, sustituye a ``_read_all_frames``)
+  + Pase C (eventos por ventana deslizante de duración fija —
+  ``core/windowing.py`` + ``EventClassifier.predict_window`` + fusión de
+  ventanas contiguas en ``EventSpan`` vía ``_merge_event_windows``). No incluye
+  clasificación de equipos ni render — eso lo orquesta ``main.py``, igual que
+  para el flujo de clip corto.
+
+Pipeline (clip corto):
     tracks.jsonl ─┬─► core.possession.iter_possession ─► posesión por frame
                   │        │
                   │        ▼ (cambios de possessor_tracker_id)
@@ -33,6 +39,9 @@ Pipeline:
 Uso rápido (standalone, desde la raíz del proyecto):
     python -m analytics.engine --source clip.mp4 --tracks tracks.jsonl \
            --teams teams.json --output final.mp4 --telemetry telemetry.json
+
+Para partidos completos, ver ``main.py --mode full-match`` (usa
+``analyze_full_match`` de este módulo).
 """
 
 from __future__ import annotations
@@ -42,24 +51,30 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, Optional
 
 import cv2
 import numpy as np
 
+from core.windowing import Window, iter_windows
+
 if TYPE_CHECKING:
     from core.ball_actions import BallActionClassifier
-    from core.events import EventClassifier
+    from core.events import EventClassifier, EventPrediction
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_POSSESSOR_DISTANCE_PX: float = 150.0
 DEFAULT_HYSTERESIS_FRAMES: int = 10
 
-_BANNER_BG: tuple[int, int, int] = (0, 0, 0)
-_BANNER_FG: tuple[int, int, int] = (255, 255, 255)
-_BANNER_ALPHA: float = 0.55
-_BANNER_LINE_HEIGHT: int = 28
+# Posiciones fijas de las tarjetas de notificación (utils.visualizers.
+# draw_notification_card) en la esquina superior izquierda: evento arriba,
+# acción de balón debajo, cada una en su propio hueco fijo -- así no "saltan"
+# de sitio cuando una aparece/desaparece independientemente de la otra.
+_EVENT_CARD_TOP_LEFT: tuple[int, int] = (14, 14)
+_ACTION_CARD_TOP_LEFT: tuple[int, int] = (14, 90)
+_NOTIFICATION_CARD_WIDTH: int = 320
+_NOTIFICATION_CARD_HEIGHT: int = 68
 
 
 # --------------------------------------------------------------------------- #
@@ -88,6 +103,45 @@ class MatchTelemetry:
 
     def to_telemetry(self) -> dict:
         """Registro serializable (recursa ``ball_actions``, lista de dataclasses)."""
+        return asdict(self)
+
+
+@dataclass
+class EventSpan:
+    """Tramo de evento fusionado a partir de ventanas deslizantes contiguas
+    con la misma etiqueta no-fondo (ver ``_merge_event_windows``). El tramo es
+    típicamente más ancho que el instante real del evento (~1 ventana de
+    margen) — es el equivalente, para partido completo, del campo ``event``
+    (singular) de ``MatchTelemetry`` para clip corto."""
+
+    label: str
+    start_s: float
+    end_s: float
+    peak_confidence: float
+    mean_confidence: float
+    n_windows: int
+
+    def to_telemetry(self) -> dict:
+        return asdict(self)
+
+
+@dataclass
+class FullMatchTelemetry:
+    """Telemetría de ``analyze_full_match`` — mismo espíritu que
+    ``MatchTelemetry`` pero con ``events`` como línea temporal (lista de
+    ``EventSpan``) en vez de un único evento por clip. Igual que
+    ``ball_actions``, se guardan los dataclasses tal cual (no ya convertidos a
+    dict) para que ``render_match_video`` los pueda reutilizar directamente;
+    ``to_telemetry()`` los serializa al final, igual que con ``ball_actions``.
+    """
+
+    source_video: str
+    events: list[EventSpan]            # línea temporal completa del partido
+    ball_actions: list[PossessionChangeAction]
+    n_frames: int
+    n_possession_changes: int
+
+    def to_telemetry(self) -> dict:
         return asdict(self)
 
 
@@ -235,44 +289,301 @@ def analyze_match(
 
 
 # --------------------------------------------------------------------------- #
+#  Partido completo: posesión + acciones de balón en streaming (Pase B) +
+#  eventos por ventana deslizante fusionados en tramos (Pase C)
+# --------------------------------------------------------------------------- #
+
+def _analyze_possession_and_ball_actions(
+    source_video: Path,
+    tracks_jsonl_path: Path,
+    ball_action_classifier: Optional["BallActionClassifier"],
+    max_possessor_distance_px: float,
+    hysteresis_frames: int,
+) -> tuple[list[PossessionChangeAction], dict[int, Optional[int]], int]:
+    """Pase B del flujo de partido completo: posesión (generador de
+    ``core.possession``, O(1) de estado) + acción de balón por cambio de
+    posesión — sin decodificar el vídeo entero (``_read_all_frames``).
+
+    Si hay ``ball_action_classifier``, mantiene un buffer de frames ACOTADO
+    (podado a medida que avanza el pase) alimentado en el mismo recorrido
+    secuencial que la posesión, y reutiliza ``_build_window`` sin cambios; si
+    no lo hay, ni siquiera abre el vídeo (solo lee el ``possession.jsonl``).
+
+    Devuelve ``(ball_actions, possessor_by_frame, n_frames)``.
+    ``possessor_by_frame`` (``frame_idx -> tracker_id | None``) es más ligero
+    que la lista completa de ``possession_records`` que usa ``analyze_match``
+    y es lo único de posesión que necesita ``render_match_video`` — apto para
+    partidos de 90 min.
+    """
+    from core.possession import ensure_possession
+
+    possession_path = ensure_possession(
+        tracks_jsonl_path, max_possessor_distance_px, hysteresis_frames
+    )
+
+    def _iter_possession_jsonl():
+        with open(possession_path) as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    yield json.loads(line)
+
+    possessor_by_frame: dict[int, Optional[int]] = {}
+    ball_actions: list[PossessionChangeAction] = []
+    n_frames = 0
+    last_possessor: Optional[int] = None
+
+    if ball_action_classifier is None:
+        # Sin acciones de balón que clasificar, no hace falta decodificar vídeo.
+        for record in _iter_possession_jsonl():
+            possessor_by_frame[record["frame_idx"]] = record.get("possessor_tracker_id")
+            n_frames += 1
+        return ball_actions, possessor_by_frame, n_frames
+
+    num_frames = ball_action_classifier.num_frames
+    half = num_frames // 2
+    frame_buffer: dict[int, np.ndarray] = {}
+    pending: list[tuple[int, int, tuple[float, float, float, float]]] = []
+
+    def _flush_ready(up_to_idx: float) -> None:
+        while pending and pending[0][0] + half <= up_to_idx:
+            trig_idx, tracker_id, bbox = pending.pop(0)
+            window = _build_window(frame_buffer, trig_idx, num_frames)
+            try:
+                pred = ball_action_classifier.predict_window(window, bbox)
+            except Exception:
+                logger.exception(
+                    "Error clasificando ventana de acción en frame %d", trig_idx
+                )
+                continue
+            ball_actions.append(
+                PossessionChangeAction(
+                    frame_idx=trig_idx,
+                    tracker_id=tracker_id,
+                    label=pred.label,
+                    confidence=pred.confidence,
+                    probabilities=pred.probabilities,
+                    is_background=pred.is_background,
+                )
+            )
+
+    cap = cv2.VideoCapture(str(source_video))
+    if not cap.isOpened():
+        raise RuntimeError(f"No se pudo abrir el vídeo: {source_video}")
+
+    try:
+        for record in _iter_possession_jsonl():
+            frame_idx = record["frame_idx"]
+            ok, frame = cap.read()
+            if not ok:
+                break
+
+            possessor = record.get("possessor_tracker_id")
+            possessor_by_frame[frame_idx] = possessor
+            n_frames += 1
+            frame_buffer[frame_idx] = frame
+
+            if possessor is not None and possessor != last_possessor:
+                bbox = _bbox_for_tracker(record, possessor)
+                if bbox is not None:
+                    pending.append((frame_idx, possessor, bbox))
+                else:
+                    logger.warning(
+                        "Sin bbox para tracker_id=%s en frame %d, salto la ventana",
+                        possessor, frame_idx,
+                    )
+            if possessor is not None:
+                last_possessor = possessor
+
+            _flush_ready(frame_idx)
+
+            min_needed = (pending[0][0] - half) if pending else (frame_idx - half)
+            for old_idx in [i for i in frame_buffer if i < min_needed]:
+                del frame_buffer[old_idx]
+    finally:
+        cap.release()
+
+    _flush_ready(float("inf"))
+    return ball_actions, possessor_by_frame, n_frames
+
+
+def _finalize_span(
+    label: str, start_s: float, end_s: float, confidences: list[float]
+) -> EventSpan:
+    return EventSpan(
+        label=label,
+        start_s=start_s,
+        end_s=end_s,
+        peak_confidence=max(confidences),
+        mean_confidence=sum(confidences) / len(confidences),
+        n_windows=len(confidences),
+    )
+
+
+def _merge_event_windows(
+    window_predictions: list[tuple[Window, "EventPrediction"]]
+) -> list[EventSpan]:
+    """Funde ventanas deslizantes contiguas/solapadas con la misma etiqueta
+    no-fondo en tramos de evento (``EventSpan``).
+
+    Regla: una ventana con ``is_background=True`` (cualquiera de las 7 clases
+    ``background_*``) nunca abre ni extiende un tramo — simplemente cierra el
+    que esté abierto. Con solape (``event_stride_s < event_window_s``), dos
+    ventanas consecutivas de la misma etiqueta se solapan por construcción,
+    así que basta comprobar que la nueva ventana empieza antes de que acabe el
+    tramo actual (``window.start_s <= current_end``).
+
+    Limitación conocida y aceptada para v1: el tramo resultante es más ancho
+    que el instante real del evento (~1 ventana de margen), y una ventana mal
+    clasificada entre dos iguales puede partir un evento en dos tramos — si
+    esto resulta un problema en la práctica, un suavizado por voto mayoritario
+    sobre las predicciones crudas antes de fusionar es la mejora natural.
+    """
+    spans: list[EventSpan] = []
+    current_label: Optional[str] = None
+    current_start = 0.0
+    current_end = 0.0
+    current_confidences: list[float] = []
+
+    for window, pred in window_predictions:
+        extends_current = (
+            current_label is not None
+            and not pred.is_background
+            and pred.label == current_label
+            and window.start_s <= current_end
+        )
+        if extends_current:
+            current_end = max(current_end, window.end_s)
+            current_confidences.append(pred.confidence)
+            continue
+
+        if current_label is not None:
+            spans.append(
+                _finalize_span(current_label, current_start, current_end, current_confidences)
+            )
+            current_label = None
+
+        if not pred.is_background:
+            current_label = pred.label
+            current_start = window.start_s
+            current_end = window.end_s
+            current_confidences = [pred.confidence]
+
+    if current_label is not None:
+        spans.append(
+            _finalize_span(current_label, current_start, current_end, current_confidences)
+        )
+
+    return spans
+
+
+def analyze_full_match(
+    source_video: Path | str,
+    detector_name: str = "hybrid",
+    ball_action_classifier: Optional["BallActionClassifier"] = None,
+    event_classifier: Optional["EventClassifier"] = None,
+    max_possessor_distance_px: float = DEFAULT_MAX_POSSESSOR_DISTANCE_PX,
+    hysteresis_frames: int = DEFAULT_HYSTERESIS_FRAMES,
+    event_window_s: float = 6.0,
+    event_stride_s: float = 3.0,
+    min_window_fraction: float = 0.5,
+    device: Optional[str] = None,
+) -> tuple[FullMatchTelemetry, Path, dict[int, Optional[int]]]:
+    """Analiza un partido completo (~90 min): Pase A (tracking, cacheado) +
+    Pase B (posesión + acciones de balón, streaming) + Pase C (eventos por
+    ventana deslizante). NO incluye clasificación de equipos
+    (``core.classification.assign_teams``) ni render (``render_match_video``)
+    — se orquestan aparte, desde ``main.py``, igual que para
+    ``analyze_match``/``render_match_video`` en el flujo de clip corto.
+
+    Devuelve ``(telemetry, tracks_jsonl_path, possessor_by_frame)`` —
+    ``tracks_jsonl_path`` y ``possessor_by_frame`` se reutilizan para el
+    render, con el mismo propósito con el que ``analyze_match`` devuelve
+    ``possession_records``.
+    """
+    from core.tracking import ensure_tracking
+
+    source_video = Path(source_video)
+
+    # Pase A: tracking (cacheado junto al vídeo — ver core.tracking.ensure_tracking)
+    tracks_path = ensure_tracking(source_video, detector_name=detector_name, device=device)
+
+    # Pase B: posesión + acciones de balón (streaming, buffer de frames acotado)
+    ball_actions, possessor_by_frame, n_frames = _analyze_possession_and_ball_actions(
+        source_video=source_video,
+        tracks_jsonl_path=tracks_path,
+        ball_action_classifier=ball_action_classifier,
+        max_possessor_distance_px=max_possessor_distance_px,
+        hysteresis_frames=hysteresis_frames,
+    )
+
+    # Pase C: eventos por ventana deslizante de duración fija -> tramos fusionados
+    events: list[EventSpan] = []
+    if event_classifier is not None:
+        import supervision as sv
+
+        video_info = sv.VideoInfo.from_video_path(str(source_video))
+        fps = float(video_info.fps or 25)
+        window_predictions: list[tuple[Window, "EventPrediction"]] = []
+        for window in iter_windows(video_info.total_frames, fps, event_window_s, event_stride_s):
+            if window.duration_s < event_window_s * min_window_fraction:
+                continue
+            try:
+                pred = event_classifier.predict_window(source_video, window.start_s, window.end_s)
+            except Exception:
+                logger.exception(
+                    "Error clasificando ventana de evento [%.2f, %.2f]s",
+                    window.start_s, window.end_s,
+                )
+                continue
+            window_predictions.append((window, pred))
+        events = _merge_event_windows(window_predictions)
+
+    telemetry = FullMatchTelemetry(
+        source_video=str(source_video),
+        events=events,
+        ball_actions=ball_actions,
+        n_frames=n_frames,
+        n_possession_changes=len(ball_actions),
+    )
+    return telemetry, tracks_path, possessor_by_frame
+
+
+# --------------------------------------------------------------------------- #
 #  Render final (equipo + posesión + banners de evento/acción)
 # --------------------------------------------------------------------------- #
 
-def _draw_banner(frame: np.ndarray, lines: Sequence[str], position: str = "top") -> np.ndarray:
-    """Franja semitransparente con texto (arriba o abajo del frame) — para el
-    evento (fijo durante todo el clip) y la acción de balón (la más reciente,
-    persiste hasta el siguiente cambio de posesión)."""
-    if not lines:
-        return frame
-    out = frame.copy()
-    h, w = out.shape[:2]
-    banner_h = _BANNER_LINE_HEIGHT * len(lines) + 12
-    y0 = 0 if position == "top" else max(0, h - banner_h)
-
-    overlay = out.copy()
-    cv2.rectangle(overlay, (0, y0), (w, y0 + banner_h), _BANNER_BG, -1)
-    out = cv2.addWeighted(overlay, _BANNER_ALPHA, out, 1 - _BANNER_ALPHA, 0)
-
-    for i, line in enumerate(lines):
-        y = y0 + 20 + i * _BANNER_LINE_HEIGHT
-        cv2.putText(
-            out, line, (10, y), cv2.FONT_HERSHEY_SIMPLEX, 0.6, _BANNER_FG, 1, cv2.LINE_AA
-        )
-    return out
+NotificationContent = tuple[str, str, str]  # (título, subtítulo, etiqueta-para-color)
 
 
-def _event_banner_line(event: Optional[dict]) -> Optional[str]:
-    if not event:
+def _event_notification_content(event: Optional[dict]) -> Optional[NotificationContent]:
+    """Contenido de la tarjeta de evento para el flujo de clip corto (fijo
+    durante todo el clip, ``telemetry.event``) — None para "fondo" (tipo de
+    plano sin evento) o si no se pidió clasificar eventos."""
+    if not event or event.get("is_background"):
         return None
-    tag = "fondo" if event.get("is_background") else "EVENTO"
-    return f"[{tag}] {event['label']} ({event['confidence']:.0%})"
+    label = event["label"]
+    return label.upper().replace("_", " "), f"{event['confidence']:.0%} confianza", label
 
 
-def _ball_action_banner_line(action: Optional[PossessionChangeAction]) -> Optional[str]:
-    if action is None:
+def _event_span_notification_content(span: Optional[EventSpan]) -> Optional[NotificationContent]:
+    """Igual que ``_event_notification_content``, para el tramo de evento
+    vigente del flujo de partido completo (``analyze_full_match``)."""
+    if span is None:
         return None
-    tag = "fondo" if action.is_background else "ACCION"
-    return f"[{tag}] Jugador #{action.tracker_id}: {action.label} ({action.confidence:.0%})"
+    return span.label.upper().replace("_", " "), f"{span.peak_confidence:.0%} confianza", span.label
+
+
+def _ball_action_notification_content(
+    action: Optional[PossessionChangeAction],
+) -> Optional[NotificationContent]:
+    if action is None or action.is_background:
+        return None
+    return (
+        action.label.upper().replace("_", " "),
+        f"Jugador #{action.tracker_id} · {action.confidence:.0%}",
+        action.label,
+    )
 
 
 def render_match_video(
@@ -280,13 +591,32 @@ def render_match_video(
     tracks_jsonl_path: Path | str,
     output_path: Path | str,
     team_by_tracker_id: Optional[dict[int, int]],
-    possession_records: list[dict],
-    telemetry: MatchTelemetry,
+    possessor_by_frame: dict[int, Optional[int]],
+    telemetry: MatchTelemetry | FullMatchTelemetry,
     trace_length: int = 30,
+    event_spans: Optional[list[EventSpan]] = None,
+    action_highlight_frames: int = 60,
 ) -> None:
-    """Segunda pasada (post-hoc) sobre el clip: cajas por equipo + resalte del
-    poseedor + banner de evento (fijo) + banner de acción de balón (la más
-    reciente en cada frame) — todo en un único ``.mp4`` de salida.
+    """Segunda pasada (post-hoc) sobre el vídeo: cajas por equipo + resalte del
+    poseedor + "notificación" visual de acción de balón (anillo verde en el
+    jugador + balón especial durante un drive) + banner de evento + banner de
+    acción de balón — todo en un único ``.mp4`` de salida.
+
+    ``action_highlight_frames`` (config.AnalyticsConfig.action_highlight_frames,
+    ~0.6s a 25fps por defecto): a diferencia del banner de acción de balón de
+    antes (que persistía "hasta la siguiente"), tanto el resalte visual como el
+    propio banner ahora se apagan pasados estos frames desde el disparador —
+    se leen como una notificación puntual, no como un estado permanente.
+
+    ``event_spans`` es opcional: si es ``None`` (flujo de clip corto, vía
+    ``analyze_match``), el banner de evento es fijo durante todo el clip
+    (``telemetry.event``, comportamiento sin cambios respecto a antes). Si se
+    pasa (flujo de partido completo, vía ``analyze_full_match``), el banner
+    cambia a lo largo del vídeo según el ``EventSpan`` vigente en cada frame —
+    mismo patrón "vigente hasta el siguiente disparador" que ya usa el banner
+    de acción de balón, salvo que aquí sí se apaga al pasar ``span.end_s``
+    (los eventos son mucho más esporádicos que los cambios de posesión; dejar
+    un banner de "GOL" fijo minutos después de que pase sería engañoso).
 
     Reutiliza ``utils.visualizers.TrackingVisualizer``/``detections_from_record``
     para la parte de cajas/etiquetas (mismo motor que ``core/tracking.py
@@ -295,7 +625,12 @@ def render_match_video(
     (que es una caja de herramientas de dibujo genérica, sin conocer eventos
     ni acciones de balón).
     """
-    from utils.visualizers import TrackingVisualizer, detections_from_record
+    from utils.visualizers import (
+        TrackingVisualizer,
+        action_color,
+        detections_from_record,
+        draw_notification_card,
+    )
 
     def _iter_tracks_jsonl(path: Path):
         with open(path, "r") as f:
@@ -307,9 +642,6 @@ def render_match_video(
     records_by_frame: dict[int, dict] = {
         rec["frame_idx"]: rec for rec in _iter_tracks_jsonl(Path(tracks_jsonl_path))
     }
-    possessor_by_frame: dict[int, Optional[int]] = {
-        rec["frame_idx"]: rec.get("possessor_tracker_id") for rec in possession_records
-    }
     if not records_by_frame:
         raise ValueError(f"tracks.jsonl vacío o sin registros: {tracks_jsonl_path}")
 
@@ -318,11 +650,10 @@ def render_match_video(
     action_by_trigger_frame = {a.frame_idx: a for a in telemetry.ball_actions}
     sorted_trigger_frames = sorted(action_by_trigger_frame.keys())
 
-    event_line = _event_banner_line(telemetry.event)
-
     import supervision as sv
 
     video_info = sv.VideoInfo.from_video_path(str(source_video))
+    source_fps = float(video_info.fps or 25)  # frame_idx de tracks.jsonl está en este espacio
     sorted_frame_indices = sorted(records_by_frame.keys())
     stride = (
         sorted_frame_indices[1] - sorted_frame_indices[0]
@@ -330,6 +661,17 @@ def render_match_video(
         else 1
     )
     video_info.fps = max(1, round(video_info.fps / max(stride, 1)))
+
+    static_event_content: Optional[NotificationContent] = None
+    event_by_trigger_frame: dict[int, EventSpan] = {}
+    sorted_event_trigger_frames: list[int] = []
+    if event_spans is not None:
+        event_by_trigger_frame = {
+            int(round(span.start_s * source_fps)): span for span in event_spans
+        }
+        sorted_event_trigger_frames = sorted(event_by_trigger_frame.keys())
+    else:
+        static_event_content = _event_notification_content(getattr(telemetry, "event", None))
 
     visualizer = TrackingVisualizer(trace_length=trace_length)
 
@@ -342,6 +684,8 @@ def render_match_video(
             frame_idx = 0
             current_action: Optional[PossessionChangeAction] = None
             trigger_ptr = 0
+            current_event_span: Optional[EventSpan] = None
+            event_trigger_ptr = 0
 
             while True:
                 rec = records_by_frame.get(frame_idx)
@@ -361,19 +705,75 @@ def render_match_video(
                 ):
                     current_action = action_by_trigger_frame[sorted_trigger_frames[trigger_ptr]]
                     trigger_ptr += 1
+                if (
+                    current_action is not None
+                    and frame_idx - current_action.frame_idx > action_highlight_frames
+                ):
+                    current_action = None
 
+                if event_spans is not None:
+                    while (
+                        event_trigger_ptr < len(sorted_event_trigger_frames)
+                        and sorted_event_trigger_frames[event_trigger_ptr] <= frame_idx
+                    ):
+                        current_event_span = event_by_trigger_frame[
+                            sorted_event_trigger_frames[event_trigger_ptr]
+                        ]
+                        event_trigger_ptr += 1
+                    if (
+                        current_event_span is not None
+                        and frame_idx / source_fps > current_event_span.end_s
+                    ):
+                        current_event_span = None
+
+                show_action = current_action is not None and not current_action.is_background
                 persons, ball_dets = detections_from_record(rec)
+
+                event_content = (
+                    _event_span_notification_content(current_event_span)
+                    if event_spans is not None
+                    else static_event_content
+                )
+
+                # Resalte de jugador/balón: la acción de balón manda si está
+                # activa (tracker_id real y concreto); si no, y hay un evento
+                # activo, se usa el poseedor del frame como aproximación de
+                # "quién está implicado" (core.events clasifica la ventana
+                # entera, no identifica jugador).
+                highlight_tracker_id: Optional[int] = None
+                highlight_label: Optional[str] = None
+                if show_action:
+                    highlight_tracker_id = current_action.tracker_id
+                    highlight_label = current_action.label
+                elif event_content is not None:
+                    possessor = possessor_by_frame.get(frame_idx)
+                    if possessor is not None:
+                        highlight_tracker_id = possessor
+                        highlight_label = event_content[2]
+
                 annotated = visualizer.annotate(
                     frame, persons, ball_dets, team_by_tracker_id,
                     possessor_tracker_id=possessor_by_frame.get(frame_idx),
+                    highlight_tracker_id=highlight_tracker_id,
+                    highlight_label=highlight_label,
                 )
 
-                banner_lines = [line for line in (event_line,) if line]
-                annotated = _draw_banner(annotated, banner_lines, position="top")
-                action_line = _ball_action_banner_line(current_action)
-                annotated = _draw_banner(
-                    annotated, [action_line] if action_line else [], position="bottom"
-                )
+                if event_content is not None:
+                    title, subtitle, color_label = event_content
+                    annotated = draw_notification_card(
+                        annotated, title, subtitle, action_color(color_label),
+                        top_left=_EVENT_CARD_TOP_LEFT,
+                        width=_NOTIFICATION_CARD_WIDTH, height=_NOTIFICATION_CARD_HEIGHT,
+                    )
+
+                action_content = _ball_action_notification_content(current_action)
+                if action_content is not None:
+                    title, subtitle, color_label = action_content
+                    annotated = draw_notification_card(
+                        annotated, title, subtitle, action_color(color_label),
+                        top_left=_ACTION_CARD_TOP_LEFT,
+                        width=_NOTIFICATION_CARD_WIDTH, height=_NOTIFICATION_CARD_HEIGHT,
+                    )
 
                 sink.write_frame(annotated)
                 frame_idx += 1
@@ -442,12 +842,15 @@ def main() -> None:
         telemetry.event["label"] if telemetry.event else "(omitido)",
     )
 
+    possessor_by_frame = {
+        r["frame_idx"]: r.get("possessor_tracker_id") for r in possession_records
+    }
     render_match_video(
         source_video=args.source,
         tracks_jsonl_path=args.tracks,
         output_path=args.output,
         team_by_tracker_id=team_by_tracker_id,
-        possession_records=possession_records,
+        possessor_by_frame=possessor_by_frame,
         telemetry=telemetry,
     )
     logger.info("Vídeo final escrito en %s", args.output)

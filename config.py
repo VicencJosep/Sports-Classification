@@ -23,7 +23,7 @@ SOCCER_MASTER_DIR: Path = PROJECT_ROOT / "Soccer_Master" / "SoccerMaster"
 SOCCER_MASTER_CONFIG: Path = SOCCER_MASTER_DIR / "configs" / "pretrain.yaml"
 SOCCER_MASTER_CHECKPOINTS: Path = SOCCER_MASTER_DIR / "pretrained_models" / "SoccerMaster"
 
-OUTPUTS_DIR: Path = PROJECT_ROOT / "outputs"
+OUTPUTS_DIR: Path = PROJECT_ROOT / "output"
 
 
 # --------------------------------------------------------------------------- #
@@ -43,17 +43,23 @@ class TrackingConfig:
     track_activation_threshold: float = 0.25
     lost_track_buffer: int = 30
     minimum_matching_threshold: float = 0.8
-    frame_rate: int = 30
+    frame_rate: int | None = None            # None -> auto-detectar del vídeo real (ver process_video)
 
 
 @dataclass(frozen=True)
 class EventsConfig:
     """Hiperparámetros de core/events.py (clasificador V-JEPA2 + SVC)."""
 
-    classifier_path: Path = PROJECT_ROOT / "svc_classifier_more_penalties.joblib"
+    classifier_path: Path = PROJECT_ROOT / "models" / "svc_classifier_more_penalties.joblib"
     model_id: str = "facebook/vjepa2-vitl-fpc64-256"
     device: str | None = None               # None -> auto (cuda si hay)
     num_frames: int = 64                    # debe coincidir con el fpc del checkpoint
+    window_s: float = 6.0                   # duración real de los clips de entrenamiento
+                                             # (medido: 238/240 clips de dataset_vjepa_backup/
+                                             # duran exactamente 6.000s a 25fps) — sample_frames
+                                             # muestrea num_frames uniformemente por TIEMPO, no
+                                             # por frame, así que la ventana de inferencia debe
+                                             # cubrir esta misma duración real, no num_frames crudos
 
 
 @dataclass(frozen=True)
@@ -69,7 +75,7 @@ class BallActionsConfig:
     o con riesgo de confusión visual, ver scripts/extract_ball_action_clips.py).
     """
 
-    checkpoint_path: Path = PROJECT_ROOT / "models" / "r3d18_ball_actions.pt"
+    checkpoint_path: Path = PROJECT_ROOT / "models" / "r3d18_ball_actions-v2.pt"
     device: str | None = None               # None -> auto (cuda si hay)
     num_frames: int = 32                    # ~1.06 s a 30 fps
     padding_factor: float = 2.5             # expansión del bbox del poseedor antes de recortar
@@ -95,13 +101,32 @@ class ClassificationConfig:
 class AnalyticsConfig:
     """Hiperparámetros de analytics/engine.py (composición final del pipeline).
 
-    Alcance actual: clips cortos ya recortados en torno a un evento (ver
-    docstring del módulo) — no partidos completos de 90 min.
+    Cubre tanto ``analyze_match`` (clip corto ya recortado) como
+    ``analyze_full_match`` (partido completo, ver ``FullMatchConfig`` para los
+    parámetros específicos de ese segundo flujo).
     """
 
     max_possessor_distance_px: float = 150.0  # igual que possession.DEFAULT_MAX_DISTANCE_PX
     hysteresis_frames: int = 10               # igual que possession.DEFAULT_HYSTERESIS_FRAMES
     trace_length: int = 30                    # estela de trayectoria en el vídeo final
+    action_highlight_frames: int = 60         # ~2.4s a 25fps: duración de la tarjeta de notificación
+                                               # + resalte de jugador/balón tras una acción de balón
+                                               # reconocida (ver utils.visualizers/render_match_video)
+
+
+@dataclass(frozen=True)
+class FullMatchConfig:
+    """Hiperparámetros del flujo de partido completo (analytics/engine.py::
+    analyze_full_match, main.py --mode full-match). Complementa a
+    ``EventsConfig``: ``window_s`` vive allí porque es intrínseco al
+    clasificador (duración de sus clips de entrenamiento); el solape/stride es
+    una decisión del flujo de partido completo, no del clasificador en sí.
+    """
+
+    event_stride_s: float = 3.0             # ~50% de solape con EventsConfig.window_s=6.0
+    min_window_fraction: float = 0.5        # descarta la ventana final si mide menos de
+                                             # esta fracción de EventsConfig.window_s
+    render_video: bool = True
 
 
 @dataclass(frozen=True)
@@ -113,4 +138,5 @@ class PipelineConfig:
     ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
     classification: ClassificationConfig = field(default_factory=ClassificationConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
+    full_match: FullMatchConfig = field(default_factory=FullMatchConfig)
     outputs_dir: Path = OUTPUTS_DIR
