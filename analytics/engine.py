@@ -171,6 +171,68 @@ def _bbox_for_tracker(record: dict, tracker_id: int) -> Optional[tuple[float, fl
     return None
 
 
+def _aggregate_ball_action_probabilities(
+    predictions: list["BallActionPrediction"],
+) -> tuple[str, float, dict[str, float]]:
+    if not predictions:
+        raise ValueError("No hay predicciones de ball action para agregar")
+
+    labels = list(predictions[0].probabilities.keys())
+    combined = {
+        label: sum(pred.probabilities.get(label, 0.0) for pred in predictions) / len(predictions)
+        for label in labels
+    }
+    best_label = max(combined, key=combined.get)
+    return best_label, float(combined[best_label]), combined
+
+
+def _predict_ball_action_temporally(
+    ball_action_classifier: "BallActionClassifier",
+    frames_by_idx: dict[int, np.ndarray],
+    records_by_frame: dict[int, dict],
+    trigger_frame_idx: int,
+    tracker_id: int,
+    trigger_bbox: tuple[float, float, float, float],
+    temporal_offsets_frames: tuple[int, ...],
+) -> "BallActionPrediction":
+    """Clasifica la ventana del trigger (opcionalmente promediando varias
+    ventanas desplazadas, ver ``config.BallActionsConfig.temporal_offsets_frames``).
+
+    El recorte replica EXACTAMENTE el de la extracción de dataset (ver
+    ``scripts/extract_ball_action_clips.py::extract_positive_clips``): bbox del
+    poseedor expandido con ``expand_with_ball_trajectory`` sobre los mismos
+    frames que se van a clasificar. Sin esa expansión el modelo veía en
+    inferencia un primer plano del jugador del que el balón desaparecía
+    (medido: recorte 12.7× más pequeño en área que en entrenamiento, balón
+    fuera de cuadro en el 92% de las ventanas) — el distribution shift contra
+    el que avisa el docstring de ``core.ball_actions.compute_crop_box``.
+    """
+    from core.ball_actions import expand_with_ball_trajectory
+
+    num_frames = ball_action_classifier.num_frames
+    center_frames = tuple(trigger_frame_idx + offset for offset in temporal_offsets_frames)
+    predictions = []
+
+    for center_idx in center_frames:
+        start, end = _window_bounds(frames_by_idx, center_idx, num_frames)
+        window = [frames_by_idx[i] for i in range(start, end + 1)]
+        record = records_by_frame.get(center_idx)
+        bbox = _bbox_for_tracker(record, tracker_id) if record is not None else None
+        if bbox is None:
+            bbox = trigger_bbox
+        bbox = expand_with_ball_trajectory(bbox, records_by_frame, start, end - start + 1)
+        predictions.append(ball_action_classifier.predict_window(window, bbox))
+
+    label, confidence, probabilities = _aggregate_ball_action_probabilities(predictions)
+    return predictions[0].__class__(
+        source=predictions[0].source,
+        label=label,
+        confidence=confidence,
+        probabilities=probabilities,
+        is_background=(label == "background"),
+    )
+
+
 def _read_all_frames(source_video: Path) -> dict[int, np.ndarray]:
     """Decodifica el clip ENTERO a memoria, indexado por frame_idx real del
     vídeo (BGR). Solo viable para clips cortos — NO usar sobre un partido
@@ -192,14 +254,21 @@ def _read_all_frames(source_video: Path) -> dict[int, np.ndarray]:
     return frames
 
 
-def _build_window(
+def _window_bounds(
     frames_by_idx: dict[int, np.ndarray], center_idx: int, num_frames: int
-) -> list[np.ndarray]:
-    """Hasta ``num_frames`` frames BGR consecutivos centrados en ``center_idx``,
-    clampados a los límites del clip. Si el clip es más corto que
-    ``num_frames``, se devuelven los disponibles — ``BallActionClassifier.
-    predict_window`` ya rellena por debajo (repite el último) vía
-    ``ensure_num_frames``."""
+) -> tuple[int, int]:
+    """``(start, end)`` inclusivos de la ventana de ``num_frames`` centrada en
+    ``center_idx`` y clampada a los frames disponibles.
+
+    Si el clip/buffer es más corto que ``num_frames`` se devuelve el rango
+    disponible — ``BallActionClassifier.predict_window`` ya rellena por debajo
+    (repite el último frame) vía ``ensure_num_frames``.
+
+    Único punto de verdad del rango: lo usan tanto los frames que se clasifican
+    como la expansión del recorte por trayectoria del balón
+    (``core.ball_actions.expand_with_ball_trajectory``), que DEBE cubrir
+    exactamente esos mismos frames y no un rango teórico que podría diferir
+    cuando la ventana se clampa al principio/final del buffer."""
     available = sorted(frames_by_idx.keys())
     if not available:
         raise ValueError("No hay frames decodificados")
@@ -208,7 +277,7 @@ def _build_window(
     start = max(lo, center_idx - half)
     end = min(hi, start + num_frames - 1)
     start = max(lo, end - num_frames + 1)
-    return [frames_by_idx[i] for i in range(start, end + 1)]
+    return start, end
 
 
 def analyze_match(
@@ -218,6 +287,7 @@ def analyze_match(
     event_classifier: Optional["EventClassifier"] = None,
     max_possessor_distance_px: float = DEFAULT_MAX_POSSESSOR_DISTANCE_PX,
     hysteresis_frames: int = DEFAULT_HYSTERESIS_FRAMES,
+    ball_action_temporal_offsets_frames: tuple[int, ...] = (0,),
 ) -> tuple[MatchTelemetry, list[dict]]:
     """Analiza un clip ya trackeado: posesión + (opcional) acción de balón por
     cambio de poseedor + (opcional) evento del clip entero.
@@ -254,9 +324,16 @@ def analyze_match(
                     tracker_id, frame_idx,
                 )
                 continue
-            window = _build_window(frames_by_idx, frame_idx, ball_action_classifier.num_frames)
             try:
-                pred = ball_action_classifier.predict_window(window, bbox)
+                pred = _predict_ball_action_temporally(
+                    ball_action_classifier=ball_action_classifier,
+                    frames_by_idx=frames_by_idx,
+                    records_by_frame=records_by_frame,
+                    trigger_frame_idx=frame_idx,
+                    tracker_id=tracker_id,
+                    trigger_bbox=bbox,
+                    temporal_offsets_frames=ball_action_temporal_offsets_frames,
+                )
             except Exception:
                 logger.exception("Error clasificando ventana de acción en frame %d", frame_idx)
                 continue
@@ -299,6 +376,7 @@ def _analyze_possession_and_ball_actions(
     ball_action_classifier: Optional["BallActionClassifier"],
     max_possessor_distance_px: float,
     hysteresis_frames: int,
+    temporal_offsets_frames: tuple[int, ...],
 ) -> tuple[list[PossessionChangeAction], dict[int, Optional[int]], int]:
     """Pase B del flujo de partido completo: posesión (generador de
     ``core.possession``, O(1) de estado) + acción de balón por cambio de
@@ -306,8 +384,11 @@ def _analyze_possession_and_ball_actions(
 
     Si hay ``ball_action_classifier``, mantiene un buffer de frames ACOTADO
     (podado a medida que avanza el pase) alimentado en el mismo recorrido
-    secuencial que la posesión, y reutiliza ``_build_window`` sin cambios; si
-    no lo hay, ni siquiera abre el vídeo (solo lee el ``possession.jsonl``).
+    secuencial que la posesión; si no lo hay, ni siquiera abre el vídeo (solo
+    lee el ``possession.jsonl``). Junto al buffer de frames se mantiene, con la
+    misma cota de poda, un buffer de los ``records`` de posesión: el recorte
+    necesita el bbox del balón en toda la ventana, no solo en el frame del
+    trigger (ver ``_predict_ball_action_temporally``).
 
     Devuelve ``(ball_actions, possessor_by_frame, n_frames)``.
     ``possessor_by_frame`` (``frame_idx -> tracker_id | None``) es más ligero
@@ -342,15 +423,29 @@ def _analyze_possession_and_ball_actions(
 
     num_frames = ball_action_classifier.num_frames
     half = num_frames // 2
+    min_offset = min(temporal_offsets_frames) if temporal_offsets_frames else 0
+    max_offset = max(temporal_offsets_frames) if temporal_offsets_frames else 0
     frame_buffer: dict[int, np.ndarray] = {}
+    # Records de posesión de los mismos frames que `frame_buffer` (de aquí sale
+    # el bbox del balón para expandir el recorte). Se poda con la misma cota:
+    # sin podarlo serían ~135k records con ~10 tracks cada uno en un partido de
+    # 90 min, creciendo linealmente hasta el final del pase.
+    records_buffer: dict[int, dict] = {}
     pending: list[tuple[int, int, tuple[float, float, float, float]]] = []
 
     def _flush_ready(up_to_idx: float) -> None:
-        while pending and pending[0][0] + half <= up_to_idx:
+        while pending and pending[0][0] + max_offset + half <= up_to_idx:
             trig_idx, tracker_id, bbox = pending.pop(0)
-            window = _build_window(frame_buffer, trig_idx, num_frames)
             try:
-                pred = ball_action_classifier.predict_window(window, bbox)
+                pred = _predict_ball_action_temporally(
+                    ball_action_classifier=ball_action_classifier,
+                    frames_by_idx=frame_buffer,
+                    records_by_frame=records_buffer,
+                    trigger_frame_idx=trig_idx,
+                    tracker_id=tracker_id,
+                    trigger_bbox=bbox,
+                    temporal_offsets_frames=temporal_offsets_frames,
+                )
             except Exception:
                 logger.exception(
                     "Error clasificando ventana de acción en frame %d", trig_idx
@@ -382,6 +477,7 @@ def _analyze_possession_and_ball_actions(
             possessor_by_frame[frame_idx] = possessor
             n_frames += 1
             frame_buffer[frame_idx] = frame
+            records_buffer[frame_idx] = record
 
             if possessor is not None and possessor != last_possessor:
                 bbox = _bbox_for_tracker(record, possessor)
@@ -397,9 +493,15 @@ def _analyze_possession_and_ball_actions(
 
             _flush_ready(frame_idx)
 
-            min_needed = (pending[0][0] - half) if pending else (frame_idx - half)
+            min_needed = (
+                min(pending_item[0] + min_offset - half for pending_item in pending)
+                if pending
+                else (frame_idx + min_offset - half)
+            )
             for old_idx in [i for i in frame_buffer if i < min_needed]:
                 del frame_buffer[old_idx]
+            for old_idx in [i for i in records_buffer if i < min_needed]:
+                del records_buffer[old_idx]
     finally:
         cap.release()
 
@@ -487,6 +589,7 @@ def analyze_full_match(
     event_window_s: float = 6.0,
     event_stride_s: float = 3.0,
     min_window_fraction: float = 0.5,
+    ball_action_temporal_offsets_frames: tuple[int, ...] = (0,),
     device: Optional[str] = None,
 ) -> tuple[FullMatchTelemetry, Path, dict[int, Optional[int]]]:
     """Analiza un partido completo (~90 min): Pase A (tracking, cacheado) +
@@ -515,6 +618,7 @@ def analyze_full_match(
         ball_action_classifier=ball_action_classifier,
         max_possessor_distance_px=max_possessor_distance_px,
         hysteresis_frames=hysteresis_frames,
+        temporal_offsets_frames=ball_action_temporal_offsets_frames,
     )
 
     # Pase C: eventos por ventana deslizante de duración fija -> tramos fusionados

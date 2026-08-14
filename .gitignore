@@ -13,6 +13,8 @@ basketball/inputs
 basketball/outputs
 basketball/models
 
+ground_truth/
+
 # ------------------------------------------------------------------ #
 # Soccer_Master: repo de terceros vendorizado. Se ignora todo salvo los
 # ficheros que hemos modificado/añadido nosotros (ver README § "Cambios

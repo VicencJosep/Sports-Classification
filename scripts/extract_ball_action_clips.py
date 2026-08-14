@@ -55,7 +55,7 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from core.ball_actions import compute_crop_box
+from core.ball_actions import compute_crop_box, expand_with_ball_trajectory
 from core.possession import DEFAULT_MAX_DISTANCE_PX, ensure_possession, iter_possession
 from core.tracking import ensure_tracking
 
@@ -212,37 +212,6 @@ def find_reference_bbox(
             if record and record.get("ball"):
                 return tuple(record["ball"]["xyxy"])
     return None
-
-
-def expand_with_ball_trajectory(
-    bbox: tuple[float, float, float, float],
-    records_by_frame: dict[int, dict],
-    start_frame: int,
-    num_frames: int,
-) -> tuple[float, float, float, float]:
-    """Expande `bbox` (referencia del poseedor/balón en el frame del evento)
-    para que también cubra la posición del balón en TODOS los frames de la
-    ventana de extracción, no solo en el instante del evento.
-
-    Necesario porque el recorte final es estático (mismo bbox para los 32
-    frames, ver extract_window_clip): si el balón se aleja del poseedor
-    dentro de la ventana — el caso típico de un ``PASS``, donde el balón sale
-    disparado hacia otro jugador justo después del evento — un recorte
-    centrado solo en el poseedor en el frame del evento pierde el balón de
-    vista a mitad de clip. Devuelve la unión (bounding box mínimo que
-    contiene todo) del `bbox` de partida y el bbox del balón en cada frame
-    donde esté detectado.
-    """
-    x1, y1, x2, y2 = bbox
-    for frame_idx in range(start_frame, start_frame + num_frames):
-        record = records_by_frame.get(frame_idx)
-        ball = record.get("ball") if record else None
-        if ball is None:
-            continue
-        bx1, by1, bx2, by2 = ball["xyxy"]
-        x1, y1 = min(x1, bx1), min(y1, by1)
-        x2, y2 = max(x2, bx2), max(y2, by2)
-    return x1, y1, x2, y2
 
 
 def _ball_visible_in_window(records_by_frame: dict[int, dict], start_frame: int, num_frames: int) -> bool:

@@ -86,6 +86,7 @@ def split_by_match(
     rng.shuffle(match_ids)
     n_val_matches = max(1, round(len(match_ids) * val_fraction)) if len(match_ids) > 1 else 0
     val_matches = set(match_ids[:n_val_matches])
+    logger.info("Partidos en validación: %s", val_matches)
 
     train = [s for s in samples if s.match_id not in val_matches]
     val = [s for s in samples if s.match_id in val_matches]

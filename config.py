@@ -81,6 +81,14 @@ class BallActionsConfig:
     padding_factor: float = 2.5             # expansión del bbox del poseedor antes de recortar
     classes: tuple[str, ...] = ("pass", "drive", "high_pass", "header", "throw_in", "background")
     max_possessor_distance_px: float = 150.0  # distancia máx. balón-jugador para resolver poseedor
+    temporal_offsets_frames: tuple[int, ...] = (0,)
+    # Ventanas (desplazadas respecto al frame del trigger) cuyas probabilidades
+    # se promedian. (0,) = una sola ventana centrada en el trigger.
+    # Medido contra ground_truth/ (20 min, 367 acciones): el trigger ya cae
+    # encima de la acción real (desfase MEDIANO de 0 frames, p25 -7 / p75 +6),
+    # así que promediar (-8, 0, 8) solo añade ventanas que ya no contienen la
+    # acción: F1 global 29.0% -> 29.2% a 3x de coste de inferencia. No
+    # reintentar sin arreglar antes el disparador (ver README/analytics.engine).
 
 
 @dataclass(frozen=True)

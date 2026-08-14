@@ -185,6 +185,7 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
         event_window_s=cfg.events.window_s,
         event_stride_s=args.event_stride_s,
         min_window_fraction=cfg.full_match.min_window_fraction,
+        ball_action_temporal_offsets_frames=cfg.ball_actions.temporal_offsets_frames,
         device=args.device,
     )
     logger.info(
