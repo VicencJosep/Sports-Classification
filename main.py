@@ -114,6 +114,68 @@ def _build_team_by_tracker_id(
     return {t["tracker_id"]: t["team_cluster"] for t in teams_data["teams"]}
 
 
+def _run_homography(
+    source_video: Path,
+    tracks_path: Path,
+    output_dir: Path,
+    cfg: config.PipelineConfig,
+    args: argparse.Namespace,
+) -> Optional[Path]:
+    """Calibra el campo y proyecta el tracking a metros.
+
+    Etapa opcional e independiente del resto del análisis: produce
+    ``tracks_2d.jsonl`` (tracking enriquecido con ``field_xy``) y, si se pide,
+    ``radar.mp4``. No modifica ``telemetry.json`` — la posesión y las acciones
+    de balón siguen calculándose en píxeles hasta que se migren de forma
+    deliberada (cambiar el umbral de posesión a metros altera los resultados
+    medidos contra ground_truth/ y merece su propia evaluación).
+
+    La caché cara (``<video>.homography.jsonl``) se guarda junto al vídeo, como
+    tracks/possession; ``tracks_2d.jsonl`` es entregable y va a --output-dir.
+    """
+    if args.skip_homography:
+        return None
+
+    from dataclasses import replace
+
+    from core.homography import (
+        ensure_homography, project_tracks, render_radar_video, video_fps,
+    )
+
+    hcfg = cfg.homography
+    if args.homography_stride is not None:
+        hcfg = replace(hcfg, stride=args.homography_stride)
+
+    homography_path = ensure_homography(source_video, hcfg, device=args.device)
+    tracks_2d_path = output_dir / "tracks_2d.jsonl"
+    project_tracks(tracks_path, homography_path, tracks_2d_path,
+                   max_gap_frames=hcfg.max_gap_frames)
+
+    if args.radar:
+        teams_path = output_dir / "teams.json"
+        team_by_tracker_id = None
+        if teams_path.exists():
+            teams_data = json.loads(teams_path.read_text())
+            team_by_tracker_id = {
+                t["tracker_id"]: t["team_cluster"] for t in teams_data["teams"]
+            }
+        render_radar_video(tracks_2d_path, output_dir / "radar.mp4",
+                           fps=video_fps(source_video),
+                           team_by_tracker_id=team_by_tracker_id)
+        logger.info("Radar escrito en %s", output_dir / "radar.mp4")
+
+    # Los dos HRNet-W48 ocupan varios GB de VRAM y ya no hacen falta; el
+    # FieldCalibrator vive dentro de ensure_homography, así que aquí ya está
+    # libre y solo queda devolver la memoria reservada por el allocator antes
+    # de cargar R3D-18 / V-JEPA2.
+    import torch
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+    return tracks_2d_path
+
+
 def _run_clip(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
     from analytics.engine import analyze_match, render_match_video
     from core.tracking import ensure_tracking
@@ -126,6 +188,10 @@ def _run_clip(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
     team_by_tracker_id = _build_team_by_tracker_id(
         args.source, tracks_path, output_dir / "teams.json", cfg, args.device, args.skip_classification
     )
+    # Antes de cargar R3D-18/V-JEPA2: la calibración es la etapa más pesada en
+    # VRAM y conviene que tenga la GPU para ella sola.
+    _run_homography(args.source, tracks_path, output_dir, cfg, args)
+
     ball_action_classifier = _build_ball_action_classifier(cfg, args.device, args.skip_ball_actions)
     event_classifier = _build_event_classifier(cfg, args.device, args.skip_events)
 
@@ -202,6 +268,10 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
         args.source, tracks_path, output_dir / "teams.json", cfg, args.device, args.skip_classification
     )
 
+    # Aquí (y no antes) porque el tracking del partido completo lo produce
+    # analyze_full_match, y así el radar puede colorearse ya por equipo.
+    _run_homography(args.source, tracks_path, output_dir, cfg, args)
+
     if not args.skip_render and cfg.full_match.render_video:
         final_path = output_dir / "final.mp4"
         render_match_video(
@@ -230,6 +300,13 @@ def main() -> None:
     parser.add_argument("--skip-classification", action="store_true", help="No asignar equipos (team_by_tracker_id=None)")
     parser.add_argument("--skip-ball-actions", action="store_true")
     parser.add_argument("--skip-events", action="store_true")
+    parser.add_argument("--skip-homography", action="store_true",
+                        help="No calibrar el campo (sin tracks_2d.jsonl ni radar.mp4)")
+    parser.add_argument("--homography-stride", type=int, default=None,
+                        help="Calibra 1 de cada N frames (por defecto, "
+                             "config.HomographyConfig.stride)")
+    parser.add_argument("--radar", action="store_true",
+                        help="Escribe radar.mp4 (vista cenital) además de tracks_2d.jsonl")
     parser.add_argument("--skip-render", action="store_true", help="No escribir final.mp4, solo telemetry.json")
     parser.add_argument(
         "--event-stride-s", type=float, default=None,

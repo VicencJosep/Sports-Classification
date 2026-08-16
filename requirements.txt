@@ -9,7 +9,9 @@ supervision>=0.25.0,<0.30   # ByteTrack, sv.Detections, anotadores
                             #  migrar a la librería `trackers` de Roboflow llegado el caso)
 opencv-python>=4.9.0
 numpy>=1.26.0
-scipy>=1.11.0               # Interpolación 2D (homography)
+scipy>=1.11.0               # least_squares del refinamiento PnL (core/homography.py)
+shapely>=2.0.0              # dependencia de PnLCalib/utils/utils_optimize.py; sin ella
+                            # el import de utils_calib peta con ModuleNotFoundError
 
 # --- Deep Learning base ---
 # torch/torchvision FIJADOS a un build cu128: `pip install torch` sin pin resuelve

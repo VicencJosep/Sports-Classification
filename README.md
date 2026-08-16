@@ -40,7 +40,7 @@ Sports-Classification/
 ├── core/
 │   ├── tracking.py            # ✅ YOLO11x + SoccerMaster + ByteTrack (genera sv.Detections con IDs)
 │   ├── possession.py          # ✅ Poseedor del balón por frame (jugador más cercano al balón)
-│   ├── homography.py          # ⏳ Calibración del campo, matriz H, interpolación 2D
+│   ├── homography.py          # ✅ Calibración del campo (PnLCalib) → matriz H → tracks_2d.jsonl + radar
 │   ├── classification.py      # ✅ Asignación de equipo (PRTReId + K-Means, 2 clusters); dorsal (ViT OCR) pendiente
 │   ├── events.py              # ✅ Inferencia de eventos (V-JEPA2 + SVC) sobre un clip .mp4
 │   └── ball_actions.py        # ✅ Inferencia de pase/regate/entrada (R3D-18) sobre ventana T=32
@@ -226,9 +226,87 @@ que hubo que resolver para llegar hasta aquí: dos imports rotos parcheados con 
 extraer embeddings, empieza por ahí — usa `--embedder stub` mientras tanto para no bloquear el
 resto del pipeline.
 
-Explícitamente fuera de alcance (ver roadmap): etiquetado izquierda/derecha de equipo (necesita
-`core/homography.py`, que a su vez depende de PnLCalib, sin vendorizar/verificar todavía) y OCR de
+Explícitamente fuera de alcance (ver roadmap): etiquetado izquierda/derecha de equipo (ya es
+posible — `core/homography.py` da la posición en metros, solo falta implementarlo) y OCR de
 dorsales (la otra mitad de este módulo en el roadmap).
+
+## Uso — homografía / calibración de campo (`core/homography.py`)
+
+Convierte el tracking de píxeles a **metros sobre un campo canónico de 105x68**, que es lo que
+hace comparables las posiciones entre frames, entre cámaras y entre partidos.
+
+### Dependencias (no versionadas, hay que traerlas a mano)
+
+```bash
+# 1) Código de PnLCalib (solo el código; no lo tocamos, por eso va entero al .gitignore)
+git clone https://github.com/mguti97/PnLCalib.git
+
+# 2) Pesos (releases v1.0.0 del mismo repo) -> models/calibration/
+mkdir -p models/calibration && cd models/calibration
+curl -L -o SV_kp    https://github.com/mguti97/PnLCalib/releases/download/v1.0.0/SV_kp
+curl -L -o SV_lines https://github.com/mguti97/PnLCalib/releases/download/v1.0.0/SV_lines
+```
+
+### Ejecución
+
+```bash
+# Integrado en el pipeline (etapa entre tracking y analytics)
+python -m main --source partido.mp4 --output-dir output/partido --mode full-match --radar
+
+# Standalone (requiere tracks.jsonl previo)
+python -m core.homography --source partido.mp4 --output tracks_2d.jsonl --radar-video radar.mp4
+```
+
+Salidas: `<video>.homography.jsonl` (caché de matrices H, junto al vídeo como tracks/possession),
+`tracks_2d.jsonl` (tracking + `field_xy` en metros) y opcionalmente `radar.mp4` (vista cenital).
+
+### Sistema de coordenadas — ojo con esto
+
+PnLCalib trabaja **centrado** (X ∈ [-52.5, 52.5], Y ∈ [-34, 34]): su `keypoint_world_coords_2D`
+aplica `[x - 52.5, y - 34]`. Este módulo NO propaga esa convención — traslada a **origen en la
+esquina** (X ∈ [0, 105], Y ∈ [0, 68]) antes de devolver nada. Todo lo que consuma `field_xy` debe
+asumir esquina. Si algún día los puntos salen todos en el cuadrante negativo, este es el motivo.
+
+### Rendimiento (medido en la RTX 4090 del contenedor)
+
+Es la etapa más cara del pipeline y es GPU-bound: son dos HRNet-W48 a 960x540 por frame. El solve
+de la homografía en CPU (RANSAC) es 0.5 ms/frame, despreciable.
+
+| | batch=1 | batch=4 | batch=8 |
+|---|---|---|---|
+| fp32 | 58 ms/frame | 41 ms/frame (6.1 GiB) | 42 ms/frame (11.6 GiB) |
+| **fp16** | 43 ms/frame | **26 ms/frame (4.7 GiB)** | 24 ms/frame (8.7 GiB) |
+
+Defaults: `half=True`, `batch_size=4`, `stride=5`. El parámetro que manda es `stride`: a 25 fps un
+partido de 90 min son 135k frames, o sea ~1 h a stride=1 y ~12 min a stride=5. Una calibración
+cada 0.2 s sobra para el paneo suave de una cámara de retransmisión.
+
+### Qué esperar de la calidad (medido sobre `ground_truth/`, 20 min de partido real)
+
+- **74% de los frames** acaban con homografía (el resto: repeticiones, planos cortos, pocas líneas
+  visibles). Se marcan con `homography_ok: false` en vez de arrastrar una H de otro plano.
+- **95% de los jugadores proyectados caen dentro del campo**, 99.3% con 5 m de margen.
+- Error de reproyección mediano ~1.9 px.
+
+⚠️  **La velocidad instantánea NO es usable todavía**: mediana 5.1 m/s, con 21% de muestras por
+encima de 12 m/s (físicamente imposible). No es culpa de la calibración — se comprobó que los
+pares de frames que comparten la MISMA H tienen peor velocidad (5.51 m/s) que los que cruzan H
+distintas (4.20), así que el jitter no viene de la homografía. Viene de arriba: el `anchor_xy` del
+tracker se mueve 3.7 px/frame de mediana y la perspectiva amplifica eso a metros en el fondo del
+campo. **Antes de publicar cualquier métrica física hace falta suavizado temporal en el espacio de
+campo** (Kalman/savgol sobre `field_xy` por `tracker_id`), que es el siguiente paso natural.
+
+### Proyecciones descartadas
+
+`project_tracks` no escribe `field_xy` cuando el punto no es proyectable (3.4% de los casos):
+`w < 0` (el punto cae detrás del plano de cámara y la división proyectiva devuelve un punto
+reflejado de aspecto plausible) o `w ≈ 0` (sobre la línea del horizonte, la homografía diverge y
+proyecta a cientos de km). Se verificó que estos descartes **no tienen sesgo de profundidad**
+(mediana de `y_img` 356.8 en descartados vs 358.5 en aceptados), así que no se está perdiendo
+sistemáticamente al equipo del fondo: son detecciones fuera del campo (banquillo, público).
+
+El balón se proyecta asumiendo z=0 y se marca con `field_xy_assumes_ground: true` — cuando está
+en el aire la proyección es incorrecta por construcción.
 
 ## Uso — módulo de eventos (`core/events.py`, standalone)
 
@@ -466,7 +544,7 @@ texto ASCII en cualquier etiqueta nueva (de ahí `(POSESION)` en vez de un emoji
 |-------|--------|-------------|
 | 1 | `core/tracking.py` | ✅ Detección + tracking |
 | 2 | `core/classification.py` | ✅ Asignación de equipo (PRTReId + K-Means); dorsal (ViT OCR) queda pendiente |
-| 3 | `core/homography.py` | Keypoints del campo → matriz H (ver `Soccer_Master/sn_calibration` como referencia) |
+| 3 | `core/homography.py` | ✅ Keypoints+líneas del campo (PnLCalib, 2 HRNet-W48) → matriz H → `tracks_2d.jsonl` (`field_xy` en metros) + `radar.mp4`. Falta CONSUMIRLA: posesión en metros, métricas físicas, zonas |
 | 4 | `analytics/engine.py` | ✅ Composición final (equipo + posesión + acción de balón + evento) en un vídeo + `telemetry.json`, sobre clips cortos ya recortados; partidos completos quedan pendientes |
 | 5 | `core/events.py` | ✅ Clasificación de eventos (V-JEPA2 + SVC) sobre clips ya recortados; falta el troceado de partido completo → clips |
 | 6 | `utils/visualizers.py` | ✅ Vídeo anotado (`--annotated-output` en `core/tracking.py`); falta `main.py` (orquestación batch multi-módulo) |
@@ -674,13 +752,19 @@ en `requirements.txt` (si es una API que existe en OTRA versión del paquete) o 
 `sys.modules` como este (si es un fichero de `prtreid` que no necesitamos para nada y cuya API
 esperada ya no existe en ninguna versión razonable).
 
-Tercera instancia del mismo patrón, ya autodocumentada en su propio fichero: `core/homography.py`
-depende de una copia externa de [PnLCalib](https://github.com/mguti97/PnLCalib) que tampoco está
-vendorizada ni verificada end-to-end en este repo (ver el aviso al principio de ese fichero).
+Tercera instancia del mismo patrón, ya resuelta: `core/homography.py` depende de
+[PnLCalib](https://github.com/mguti97/PnLCalib), que ahora se clona en `PnLCalib/` (ignorado por
+git, igual que `Soccer_Master/`) y está verificado end-to-end. Dio exactamente el fallo esperado
+del patrón: `utils/utils_optimize.py` importa `shapely`, que no estaba instalado —
+`ModuleNotFoundError` en el primer `import utils.utils_calib`. Añadido a `requirements.txt`.
+
+Reutiliza `core.tracking._repo_import_context` sin cambios: PnLCalib define un paquete namespace
+`utils` que choca con el `utils/` regular del proyecto, que es literalmente el mismo problema que
+ese context manager ya resolvía para `Soccer_Master`.
 
 Puntero cruzado para quien llegue a depurar cualquiera de las tres: `torch`/`transformers`
 (pineados en `requirements.txt`, incidentes documentados arriba), `prtreid`/`bpbreid` (sin pin,
-esta sección), `PnLCalib` (sin vendorizar, docstring de `core/homography.py`).
+esta sección), `PnLCalib` (`shapely`, esta sección).
 
 ### A vigilar (no rompe todavía): `scikit-learn` sin techo y el `.joblib` de `core/events.py`
 

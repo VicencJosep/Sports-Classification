@@ -15,6 +15,12 @@ basketball/models
 
 ground_truth/
 
+# PnLCalib: repo de terceros clonado tal cual (calibración de campo). A
+# diferencia de Soccer_Master no hemos modificado nada dentro, así que se
+# ignora entero — se recupera con:
+#   git clone https://github.com/mguti97/PnLCalib.git
+PnLCalib/
+
 # ------------------------------------------------------------------ #
 # Soccer_Master: repo de terceros vendorizado. Se ignora todo salvo los
 # ficheros que hemos modificado/añadido nosotros (ver README § "Cambios

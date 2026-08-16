@@ -23,6 +23,11 @@ SOCCER_MASTER_DIR: Path = PROJECT_ROOT / "Soccer_Master" / "SoccerMaster"
 SOCCER_MASTER_CONFIG: Path = SOCCER_MASTER_DIR / "configs" / "pretrain.yaml"
 SOCCER_MASTER_CHECKPOINTS: Path = SOCCER_MASTER_DIR / "pretrained_models" / "SoccerMaster"
 
+# Repositorio PnLCalib (calibración de campo: keypoints + líneas -> homografía).
+# Clonado de https://github.com/mguti97/PnLCalib — solo se usa su CÓDIGO
+# (model/, utils/, config/); los pesos SV_kp/SV_lines viven en models/calibration/.
+PNLCALIB_DIR: Path = PROJECT_ROOT / "PnLCalib"
+
 OUTPUTS_DIR: Path = PROJECT_ROOT / "output"
 
 
@@ -106,6 +111,57 @@ class ClassificationConfig:
 
 
 @dataclass(frozen=True)
+class HomographyConfig:
+    """Hiperparámetros de core/homography.py (calibración de campo PnLCalib).
+
+    Los defaults de ``stride``/``batch_size``/``half`` salen de medir el coste
+    real en la RTX 4090 del contenedor (2 HRNet-W48 a 960x540 por frame):
+
+        fp32 batch=1   58 ms/frame   1.9 GiB      fp16 batch=1   43 ms/frame
+        fp32 batch=4   41 ms/frame   6.1 GiB      fp16 batch=4   26 ms/frame  4.7 GiB
+        fp32 batch=8   42 ms/frame  11.6 GiB      fp16 batch=8   24 ms/frame  8.7 GiB
+
+    El solve de la homografía en CPU (RANSAC + correspondencias) es
+    despreciable al lado: 0.5 ms/frame. Es decir, esto es GPU-bound y el
+    único parámetro que mueve la aguja de verdad es ``stride``: a 25 fps un
+    partido de 90 min son 135k frames = ~1h a stride=1, ~12 min a stride=5.
+    stride=5 (una calibración cada 0.2 s) es de sobra para el paneo de una
+    cámara de retransmisión, que es un movimiento suave y lento.
+    """
+
+    pnlcalib_repo_path: Path = PNLCALIB_DIR
+    weights_kp: Path = PROJECT_ROOT / "models" / "calibration" / "SV_kp"
+    weights_line: Path = PROJECT_ROOT / "models" / "calibration" / "SV_lines"
+    device: str | None = None               # None -> auto (cuda si hay)
+    half: bool = True                       # autocast fp16 (ver tabla de arriba)
+    batch_size: int = 4                     # frames por forward de HRNet
+    stride: int = 5                         # calibra 1 de cada N frames
+
+    # Umbrales de decodificación de heatmaps: los mismos que usan los autores
+    # en PnLCalib/inference.py — no son redondos porque salen de su barrido.
+    kp_threshold: float = 0.3434
+    line_threshold: float = 0.7867
+    model_input_size: tuple[int, int] = (960, 540)  # (w, h), fijo por entrenamiento
+
+    use_ransac: float = 5.0                 # umbral (px) de cv2.findHomography
+    pnl_refine: bool = False                # refinamiento PnL con líneas (más lento/preciso)
+
+    # Descarta homografías con error de reproyección absurdo: una H "resuelta"
+    # pero mala proyecta jugadores a cientos de metros y contamina las métricas
+    # más que no tener homografía.
+    max_reprojection_error_px: float = 25.0
+
+    # Hueco máximo (en frames) para reutilizar la H de un frame vecino ya
+    # calibrado. Más allá (repetición, plano corto, cámara táctica) es
+    # preferible no tener homografía a arrastrar una obsoleta.
+    max_gap_frames: int = 25
+
+    # Dimensiones canónicas del campo (estándar FIFA / SoccerNet-Calibration)
+    pitch_length_m: float = 105.0
+    pitch_width_m: float = 68.0
+
+
+@dataclass(frozen=True)
 class AnalyticsConfig:
     """Hiperparámetros de analytics/engine.py (composición final del pipeline).
 
@@ -145,6 +201,7 @@ class PipelineConfig:
     events: EventsConfig = field(default_factory=EventsConfig)
     ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
     classification: ClassificationConfig = field(default_factory=ClassificationConfig)
+    homography: HomographyConfig = field(default_factory=HomographyConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
     full_match: FullMatchConfig = field(default_factory=FullMatchConfig)
     outputs_dir: Path = OUTPUTS_DIR
