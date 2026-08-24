@@ -5,9 +5,10 @@ core/homography.py
 Calibración de campo y proyección del tracking a coordenadas 2D de campo
 (metros), usando los dos HRNet de PnLCalib (keypoints + líneas).
 
-Repo vendorizado en ``PnLCalib/`` (clonado de https://github.com/mguti97/PnLCalib);
-pesos ``SV_kp`` / ``SV_lines`` en ``models/calibration/`` (releases v1.0.0 del
-mismo repo). Ninguno de los dos se versiona — ver .gitignore.
+Repo vendorizado en ``models/homography/PnLCalib/`` (clonado de
+https://github.com/mguti97/PnLCalib); pesos ``SV_kp`` / ``SV_lines`` en
+``models/homography/weights/`` (releases v1.0.0 del mismo repo). Ninguno de los
+dos se versiona — ver .gitignore.
 
 Sistema de coordenadas
 ----------------------
@@ -151,7 +152,8 @@ class FieldCalibrator:
         if not (repo_path / "model" / "cls_hrnet.py").exists():
             raise FileNotFoundError(
                 f"No encuentro el código de PnLCalib en {repo_path}. "
-                "Clónalo con: git clone https://github.com/mguti97/PnLCalib.git"
+                "Clónalo con: git clone https://github.com/mguti97/PnLCalib.git "
+                f"{repo_path.parent}/PnLCalib"
             )
 
         with _repo_import_context(repo_path):
@@ -186,7 +188,7 @@ class FieldCalibrator:
                 raise FileNotFoundError(
                     f"Faltan los pesos de calibración: {path}. Descárgalos de "
                     "https://github.com/mguti97/PnLCalib/releases/tag/v1.0.0 "
-                    "(SV_kp y SV_lines) a models/calibration/."
+                    "(SV_kp y SV_lines) a models/homography/weights/."
                 )
 
         self.model_kp = self._get_cls_net(self._cfg_kp)

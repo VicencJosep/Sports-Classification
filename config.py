@@ -25,8 +25,9 @@ SOCCER_MASTER_CHECKPOINTS: Path = SOCCER_MASTER_DIR / "pretrained_models" / "Soc
 
 # Repositorio PnLCalib (calibración de campo: keypoints + líneas -> homografía).
 # Clonado de https://github.com/mguti97/PnLCalib — solo se usa su CÓDIGO
-# (model/, utils/, config/); los pesos SV_kp/SV_lines viven en models/calibration/.
-PNLCALIB_DIR: Path = PROJECT_ROOT / "PnLCalib"
+# (model/, utils/, config/). Vive bajo models/homography/ — para no ensuciar la
+# raíz — junto a sus pesos SV_kp/SV_lines, en models/homography/weights/.
+PNLCALIB_DIR: Path = PROJECT_ROOT / "models" / "homography" / "PnLCalib"
 
 OUTPUTS_DIR: Path = PROJECT_ROOT / "output"
 
@@ -130,8 +131,8 @@ class HomographyConfig:
     """
 
     pnlcalib_repo_path: Path = PNLCALIB_DIR
-    weights_kp: Path = PROJECT_ROOT / "models" / "calibration" / "SV_kp"
-    weights_line: Path = PROJECT_ROOT / "models" / "calibration" / "SV_lines"
+    weights_kp: Path = PROJECT_ROOT / "models" / "homography" / "weights" / "SV_kp"
+    weights_line: Path = PROJECT_ROOT / "models" / "homography" / "weights" / "SV_lines"
     device: str | None = None               # None -> auto (cuda si hay)
     half: bool = True                       # autocast fp16 (ver tabla de arriba)
     batch_size: int = 4                     # frames por forward de HRNet
@@ -194,6 +195,55 @@ class FullMatchConfig:
 
 
 @dataclass(frozen=True)
+class PublisherConfig:
+    """Hiperparámetros de automation/molmo_publisher.py (MolmoWeb-4B + Playwright).
+
+    A diferencia del resto de módulos, aquí casi todo son parámetros de
+    *navegación*, no de modelo: el VLM solo aporta las coordenadas del clic.
+
+    ``viewport`` es el que más se nota en la tasa de acierto: los prompts
+    describen posiciones ("arriba a la derecha") y el layout de YouTube Studio
+    es responsive, así que cambiarlo cambia lo que ve el modelo. Fijarlo hace
+    reproducible el flujo entre ejecuciones y máquinas.
+    """
+
+    model_id: str = "allenai/MolmoWeb-4B"
+    device: str | None = None               # None -> auto (cuda si hay)
+    dtype: str = "bfloat16"                 # los autores recomiendan float32, pero el
+                                             # modelo (Qwen3-8B de base) no cabe en 24 GB
+                                             # así; si las coordenadas salen erráticas,
+                                             # esta es la primera sospechosa
+    max_new_tokens: int = 200               # el JSON {"thought":…, "action":{…}} cabe de sobra
+
+    # El VLM corre en un intérprete APARTE. No es capricho: el checkpoint se
+    # guardó con transformers 4.57.3 y su repo pinea >=4.51,<5, mientras que
+    # este repo fija 5.14.1 por la API de Siglip de Soccer_Master. Con la 5.x el
+    # código remoto del checkpoint falla en cadena (RoPE, ProcessorMixin,
+    # cache_position). Ver automation/molmo_server.py.
+    venv_python: Path = Path("/opt/venv-molmo/bin/python")
+
+    # Perfil persistente de Chromium: guarda las cookies de Google para no
+    # repetir login/2FA en cada ejecución. Ignorado por .gitignore — contiene
+    # credenciales de sesión, NO se versiona.
+    user_data_dir: Path = PROJECT_ROOT / "automation" / "chrome_session"
+    headless: bool = False                  # Studio se comporta peor en headless
+                                             # y el login inicial exige ventana
+    viewport_width: int = 1440
+    viewport_height: int = 900
+
+    studio_url: str = "https://studio.youtube.com"
+    default_visibility: str = "private"     # "private" | "unlisted"; "public" no
+                                             # se ofrece a propósito (banco de pruebas)
+
+    # Pausas (ms) antes de cada captura: una captura tomada a mitad de la
+    # animación de un modal le da al VLM una UI a medio pintar y las
+    # coordenadas salen desplazadas.
+    settle_ms: int = 2500
+    modal_settle_ms: int = 4000             # apertura del diálogo de subida
+    upload_settle_ms: int = 8000            # tras soltar el fichero: parseo + formulario
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     """Configuración raíz que main.py pasará a cada módulo."""
 
@@ -204,4 +254,5 @@ class PipelineConfig:
     homography: HomographyConfig = field(default_factory=HomographyConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
     full_match: FullMatchConfig = field(default_factory=FullMatchConfig)
+    publisher: PublisherConfig = field(default_factory=PublisherConfig)
     outputs_dir: Path = OUTPUTS_DIR

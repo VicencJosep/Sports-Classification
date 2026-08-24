@@ -9,6 +9,10 @@ models/
 .env
 output/
 
+# Perfil persistente de Chromium usado por automation/molmo_publisher.py:
+# contiene las COOKIES DE SESIÓN de Google. Nunca se versiona.
+automation/chrome_session/
+
 basketball/inputs
 basketball/outputs
 basketball/models
@@ -17,9 +21,9 @@ ground_truth/
 
 # PnLCalib: repo de terceros clonado tal cual (calibración de campo). A
 # diferencia de Soccer_Master no hemos modificado nada dentro, así que se
-# ignora entero — se recupera con:
-#   git clone https://github.com/mguti97/PnLCalib.git
-PnLCalib/
+# ignora entero. Vive dentro de models/ (ya ignorado arriba) — se recupera con:
+#   git clone https://github.com/mguti97/PnLCalib.git models/homography/PnLCalib
+models/homography/
 
 # ------------------------------------------------------------------ #
 # Soccer_Master: repo de terceros vendorizado. Se ignora todo salvo los

@@ -231,6 +231,55 @@ def _run_clip(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
         )
         logger.info("Vídeo final escrito en %s", final_path)
 
+        if args.publish:
+            _run_publish(final_path, args, cfg)
+
+
+def _run_publish(
+    video_path: Path, args: argparse.Namespace, cfg: config.PipelineConfig
+) -> None:
+    """Último eslabón del pipeline: sube ``final.mp4`` a YouTube Studio.
+
+    Import perezoso (como el resto de módulos pesados de main.py): quien no use
+    ``--publish`` no paga ni Playwright ni la carga de MolmoWeb-4B. El resultado
+    se escribe junto a los demás entregables, en ``--output-dir``.
+    """
+    from automation.molmo_publisher import publish_clip
+
+    pub = cfg.publisher
+    result = publish_clip(
+        video_path,
+        args.publish_title,
+        visibility=args.publish_visibility,
+        model_id=pub.model_id,
+        device=args.device or pub.device,
+        dtype=pub.dtype,
+        max_new_tokens=pub.max_new_tokens,
+        venv_python=pub.venv_python,
+        user_data_dir=pub.user_data_dir,
+        headless=pub.headless,
+        viewport={"width": pub.viewport_width, "height": pub.viewport_height},
+        settle_ms=pub.settle_ms,
+        modal_settle_ms=pub.modal_settle_ms,
+        upload_settle_ms=pub.upload_settle_ms,
+        dry_run=args.publish_dry_run,
+        debug_dir=args.output_dir / "publish_debug",
+        studio_url=pub.studio_url,
+    )
+
+    publish_path = args.output_dir / "publish.json"
+    with open(publish_path, "w") as f:
+        json.dump(result.to_telemetry(), f, indent=2, ensure_ascii=False)
+
+    if result.error:
+        # No se relanza: el análisis (telemetry.json + final.mp4) ya está en
+        # disco y es el entregable de verdad; la publicación es un extra.
+        logger.error("Publicación fallida: %s (detalle en %s)", result.error, publish_path)
+    else:
+        logger.info(
+            "%s -> %s", "Publicado" if result.published else "Dry-run completado", publish_path
+        )
+
 
 def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
     from analytics.engine import analyze_full_match, render_match_video
@@ -308,6 +357,19 @@ def main() -> None:
     parser.add_argument("--radar", action="store_true",
                         help="Escribe radar.mp4 (vista cenital) además de tracks_2d.jsonl")
     parser.add_argument("--skip-render", action="store_true", help="No escribir final.mp4, solo telemetry.json")
+    parser.add_argument("--publish", action="store_true",
+                        help="Solo --mode clip: sube final.mp4 a YouTube Studio con "
+                             "automation/molmo_publisher.py (requiere sesión de Google ya "
+                             "guardada: python -m automation.molmo_publisher --login-only)")
+    parser.add_argument("--publish-title", default="Test Clip Short",
+                        help="Título del vídeo publicado")
+    parser.add_argument("--publish-visibility", choices=["private", "unlisted", "public"],
+                        default=None,
+                        help="Visibilidad al publicar (por defecto, "
+                             "config.PublisherConfig.default_visibility)")
+    parser.add_argument("--publish-dry-run", action="store_true",
+                        help="Ensayo de publicación: navega hasta el selector de ficheros "
+                             "y para ahí, sin entregar el vídeo (capturas en publish_debug/)")
     parser.add_argument(
         "--event-stride-s", type=float, default=None,
         help="Solo --mode full-match: paso (s) de la ventana deslizante de eventos "
@@ -323,6 +385,13 @@ def main() -> None:
     cfg = config.PipelineConfig()
     if args.event_stride_s is None:
         args.event_stride_s = cfg.full_match.event_stride_s
+    if args.publish_visibility is None:
+        args.publish_visibility = cfg.publisher.default_visibility
+
+    if args.publish and args.mode != "clip":
+        parser.error("--publish solo está soportado con --mode clip (se publica final.mp4)")
+    if args.publish and args.skip_render:
+        parser.error("--publish necesita el render: quita --skip-render")
 
     if args.mode == "clip":
         _run_clip(args, cfg)
