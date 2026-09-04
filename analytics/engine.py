@@ -900,6 +900,10 @@ def main() -> None:
     parser.add_argument("--telemetry", default=None, type=Path, help="Si se indica, escribe también telemetry.json")
     parser.add_argument("--skip-ball-actions", action="store_true", help="No cargar/correr core.ball_actions")
     parser.add_argument("--skip-events", action="store_true", help="No cargar/correr core.events")
+    parser.add_argument("--events-backend", choices=["vjepa2", "videoarm", "direct", "hybrid"], default="vjepa2",
+                        help="Clasificador de eventos: 'vjepa2' (core.events, in-process, por "
+                             "defecto) o los de core.events_vllm (requieren el servidor vLLM "
+                             "arrancado): 'videoarm', 'direct', 'hybrid' (el mejor medido, ver README)")
     parser.add_argument("--device", default=None)
     parser.add_argument("--max-possessor-distance-px", type=float, default=DEFAULT_MAX_POSSESSOR_DISTANCE_PX)
     parser.add_argument("--hysteresis-frames", type=int, default=DEFAULT_HYSTERESIS_FRAMES)
@@ -927,9 +931,20 @@ def main() -> None:
 
     event_classifier = None
     if not args.skip_events:
-        from core.events import EventClassifier
+        # Ambos backends cumplen el mismo contrato (predict/predict_window ->
+        # EventPrediction), así que analyze_match no distingue cuál recibe.
+        if args.events_backend in ("videoarm", "direct", "hybrid"):
+            from core.events_vllm import DirectVLMEventClassifier, HybridEventClassifier, VideoARMEventClassifier
 
-        event_classifier = EventClassifier(device=args.device)
+            event_classifier = {
+                "videoarm": VideoARMEventClassifier,
+                "direct": DirectVLMEventClassifier,
+                "hybrid": HybridEventClassifier,
+            }[args.events_backend]()
+        else:
+            from core.events import EventClassifier
+
+            event_classifier = EventClassifier(device=args.device)
 
     telemetry, possession_records = analyze_match(
         source_video=args.source,

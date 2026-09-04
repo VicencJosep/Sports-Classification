@@ -354,6 +354,253 @@ señal del evento se diluye entre miles de frames irrelevantes y la predicción 
 útil. Trocear un partido completo en clips (sliding window / detección de escenas) es
 tarea de una capa superior (`analytics/engine.py` o `main.py`), pendiente de implementar.
 
+## Uso — eventos vía orquestador (`core/events_vllm.py`, VideoARM + Qwen3.5-9B/vLLM)
+
+Backend **alternativo** a `core/events.py`: en vez de embeddings de V-JEPA2 + un SVC
+entrenado, un orquestador agéntico ([VideoARM](https://github.com/MILVLG/videoarm))
+razona sobre el clip llamando a sus propias herramientas (`scene_snapper`,
+`clip_analyzer`) contra un VLM local — **Qwen3.5-9B servido con vLLM**. No sustituye al
+otro: los dos conviven y se eligen con `--events-backend`.
+
+Los dos cumplen el **mismo contrato** (`predict` / `predict_window` → `EventPrediction`),
+así que `analytics/engine.py` los consume de forma duck-typed y no distingue cuál recibe.
+Diferencias que sí se notan:
+
+| | `vjepa2` (`core/events.py`) | `videoarm` (`core/events_vllm.py`) |
+|---|---|---|
+| Modelo | V-JEPA2 + SVC, **en este proceso** | Qwen3.5-9B en **otro contenedor**, por HTTP |
+| GPU | usa `--device` de este proceso | no usa la GPU de este proceso |
+| Clases | 16 (9 eventos + 7 subtipos de fondo) | 10 (9 eventos + `background`) |
+| Entrenamiento | requiere el `.joblib` entrenado | zero-shot, solo prompt |
+| Requisito | ninguno | el servidor vLLM arrancado |
+
+### 1. Servir Qwen3.5-9B con vLLM
+
+```bash
+./scripts/serve_events_vllm.sh --detach     # arranca en segundo plano
+docker logs -f vllm-events                  # seguir la carga (tarda unos minutos)
+curl http://localhost:8010/v1/models        # comprobar que está vivo
+docker rm -f vllm-events                    # parar
+```
+
+Decisiones que lleva ese script dentro, todas revisables por variable de entorno:
+
+- **Contenedor, no venv.** vLLM resuelve su propio torch/CUDA y no convive con los pines
+  de `requirements.txt` (`torch==2.11.0+cu128`, `transformers==5.14.1`). La imagen oficial
+  `vllm/vllm-openai:v0.28.0` lo aísla del todo — mismo motivo que el intérprete aparte de
+  MolmoWeb-4B, pero sin necesitar root en el host. `Qwen3_5ForConditionalGeneration` ya
+  está en el registro de modelos de las releases estables (verificado en v0.26.0 y
+  v0.28.0): **no** hace falta compilar la rama `main`.
+- **`--quantization fp8`.** En bf16 el checkpoint ocupa 19,3 GB y no cabe junto a la caché
+  KV en una 4090 de 24 GB **compartida con otros procesos del host**. FP8 (W8A8, al vuelo
+  desde el bf16) lo deja en ~10 GB. La 4090 es Ada (compute capability 8.9), que tiene FP8
+  nativo; el único checkpoint precuantizado del Hub es NVFP4, que exigiría Blackwell.
+  `QUANTIZATION="" ./scripts/serve_events_vllm.sh` sirve en bf16 si algún día sobra VRAM.
+- **`--tool-call-parser qwen3_xml`.** VideoARM invoca sus herramientas por function
+  calling, así que el servidor tiene que saber parsearlas. Qwen3.5 **no** emite el JSON de
+  Hermes sino un XML anidado (`<tool_call><function=...><parameter=...>`), que es lo que
+  espera este parser. Con el parser equivocado el agente no consigue llamar a ninguna
+  herramienta y se queda sin evidencia que mirar.
+- **Puerto 8010**, no el 8000 por defecto de vLLM: con `--network host` se comparte el
+  espacio de puertos del host, donde 8000/8001 ya los ocupa otro proyecto. Si se cambia,
+  cambiar también `config.VideoARMEventsConfig.base_url`.
+- **`HF_HOME=/models`**, replicando el `Dockerfile` del proyecto: los ~19 GB de pesos caen
+  en `models/hub/`, junto a V-JEPA2 y MolmoWeb-4B, no en el `~/.cache` del host. El caché de
+  `torch.compile` se monta aparte en `models/vllm-cache/`: sin eso vive dentro del contenedor y
+  cada reinicio recompila (24 s vs 5 s medidos).
+
+### La VRAM hay que repartirla: `--gpu-memory-utilization` es el parámetro delicado
+
+vLLM reserva su fracción de VRAM **de forma permanente**, no solo mientras atiende peticiones.
+Con una sola 4090 compartida entre este servidor y el resto del pipeline, el margen es estrecho
+por los dos lados:
+
+- Con `0.80`, `python -m main --events-backend videoarm` **muere con CUDA OOM** al cargar
+  SoccerMaster para el tracking (que pide ~3 GB) — no queda nada libre.
+- Con `0.55`, el que no arranca es vLLM: `ValueError: No available memory for the cache blocks`.
+  Los pesos en fp8 ya son 10,8 GB, y encima va la caché del encoder de visión.
+- Y entre medias aparece un tercer límite, propio de **Qwen3.5 como modelo híbrido**: sus capas
+  Mamba reservan un bloque de caché **por secuencia en decodificación**, así que con el defecto
+  de vLLM (`max_num_seqs=256`) y la VRAM justa el arranque muere con
+  `max_num_seqs (256) exceeds available Mamba cache blocks (92)`. El script fija
+  **`--max-num-seqs 16`**: aquí no hay concurrencia que aprovechar —`core/events_vllm.py`
+  clasifica los clips de uno en uno— y bajarlo es justo lo que libera bloques para poder
+  reservar menos VRAM.
+
+Por eso el script usa **`0.65`** por defecto, que deja convivir a las dos etapas. Súbelo solo si
+este servidor va a tener la GPU para él —clasificando clips ya troceados, sin tracking en
+paralelo— y recuerda que en esta máquina hay **otros procesos ajenos al proyecto** usando la
+GPU: comprueba `nvidia-smi` antes de dar por bueno un número.
+
+La alternativa, si el reparto no cuadra, es serializar: el tracking ya se cachea en
+`*.tracks.jsonl` (`core.tracking.ensure_tracking`), así que se puede correr el tracking con el
+servidor parado y arrancarlo después para la etapa de eventos.
+
+### 2. Clasificar
+
+```bash
+# Un clip suelto
+python -m core.events_vllm --source datasets/clips_analisis/goal/goal1.mp4
+
+# Una carpeta -> JSONL con una predicción por línea (mismo formato que core.events)
+python -m core.events_vllm --source datasets/clips_analisis/corner/ --output events.jsonl
+
+# Solo una ventana de un partido completo (recorta con ffmpeg y clasifica ese trozo)
+python -m core.events_vllm --source partido.mp4 --start-s 120 --end-s 126
+# --base-url / --model-id / --max-iterations / --total-frames-limit sobreescriben defaults
+```
+
+La salida es el mismo `EventPrediction.to_telemetry()` que `core/events.py`, con
+`probabilities` sobre las 10 etiquetas en vez de 16.
+
+### 3. En el pipeline principal
+
+```bash
+python -m main --source partido.mp4 --output-dir output/mipartido --mode full-match \
+       --events-backend videoarm
+```
+
+`--events-backend` (`vjepa2` por defecto) existe también en `analytics/engine.py`. Con
+`videoarm`, `--device` no afecta al clasificador de eventos: el modelo no vive en este
+proceso.
+
+### Qué esperar de la calidad (medido, 12 clips de `clips_analisis/`)
+
+Con la configuración por defecto de arriba, sobre 2 clips de cada una de 6 clases
+(`goal`, `corner`, `foul`, `substitution`, `yellow_card`, `kick-off`):
+
+| | max_iterations=4 (sin parche) | **max_iterations=1 + parche (por defecto)** |
+|---|---|---|
+| Respuestas ilegibles | 9 / 12 | **0 / 12** |
+| Aciertos | 3 / 12 | **3 / 12** |
+| Tiempo | 94 s | **79 s** (~6,6 s por clip) |
+
+El salto real está en la columna de ilegibles: con `max_iterations=4` nueve de las doce
+"predicciones" no eran predicciones, sino el fallback por búsqueda de subcadena de
+`_parse_response` sobre un tool call mal formado — el 3/12 de esa columna es literalmente
+suerte. Con la configuración por defecto las doce salidas son distribuciones que el modelo ha
+emitido de verdad.
+
+Dicho eso, **3/12 zero-shot no compite con el SVC entrenado** de `core/events.py`. Ese primer
+eval (12 clips, 2 por clase de 6) era demasiado pequeño para sacar nada en firme, así que se
+repitió con un eval MUCHO más serio: el pool COMPLETO de `goal`/`shots_on_target`/
+`shots_off_target` en `clips_analisis/` (61 clips: 33 goal + 9 + 19 shot, sin submuestrear
+nada), comparando cuatro configuraciones sobre el mismo set.
+
+### ¿Aporta valor VideoARM? (medido sobre el pool completo, 61 clips goal+shot)
+
+Antes de responder eso hacía falta aislar la variable: ¿el valor (si lo hay) viene del modelo
+(Qwen3.5-9B) o de la capa de orquestación de VideoARM (tool-calling, navegación coarse-to-fine,
+memoria HM3)? Para eso se construyó `DirectVLMEventClassifier` — el MISMO modelo, hablando con
+el MISMO servidor vLLM, pero SIN pasar por VideoARM: un único mensaje con N frames y la pregunta
+de clasificación, sin tools. Comparado contra `VideoARMEventClassifier` y el SVC entrenado:
+
+| Backend | Total | `goal` | `shot` | `shot`→`background` | Latencia/clip |
+|---|---|---|---|---|---|
+| SVC entrenado (`core/events.py`) | 27/61 (44%) | 16/33 (48%) | 11/28 (39%) | 11/28 | 0,8 s |
+| VideoARM + Qwen3.5-9B, sin forzar `clip_analyzer` | 30/61 (49%) | 19/33 (58%) | 11/28 (39%) | 11/28 | 10,2 s |
+| Directo (mismo modelo, sin VideoARM) | 31/61 (51%) | **82%** | 14% | 19/28 | 4,0 s |
+| **Híbrido v1** (directo + VideoARM sin forzar `clip_analyzer`) | 40/61 (66%) | 91% | 36% | — | ~8,8 s |
+| **Híbrido v2** (directo + `clip_analyzer` forzado, config actual) | **42/61 (69%)** | 85% | **50%** | — | ~9 s |
+
+Respuesta corta: **sí aporta valor, pero no donde se esperaba, y no solo.** Ninguno de los
+backends individuales gana en las dos clases a la vez: el directo arrasa en `goal` (evento
+visualmente inequívoco, no necesita navegación) pero falla `shot` sistemáticamente hacia
+`background` (68% de los tiros reales, sin herramienta para "mirar más de cerca"); VideoARM,
+en cambio, es donde `shot` mejora — y ahí hubo una segunda ronda de iteración que merece
+contarse porque el resultado fue contraintuitivo:
+
+**Se encontró un bug real**: `clip_analyzer` manda hasta 50 frames sueltos por llamada (no en
+mosaico, a diferencia de `scene_snapper`), pero el servidor limita `--limit-mm-per-prompt` a
+16 -- la llamada fallaba con **400 en silencio** (`_execute_tool` de VideoARM solo atrapa
+`TypeError`, no errores HTTP), así que el agente se quedaba sin esa evidencia sin enterarse.
+Se corrigió bajando `frame_analysis_max_frames` a 16 (`VIDEOARM_FRAME_ANALYSIS_MAX_FRAMES`).
+De paso se midió que, incluso arreglado ese bug, el agente solo elegía `clip_analyzer` como
+segunda herramienta el 46% de las veces (repetía `scene_snapper`) -- así que también se forzó
+la iteración 2 a esa función concreta vía `tool_choice={"type":"function","function":{"name":
+"clip_analyzer"}}` (sí soportado por vLLM), y se sustituyó la pregunta que el agente le hacía
+(genérica, "describe el evento") por una fija centrada en la disyuntiva real: ¿hay un intento
+de tiro, y entra o no en la red?
+
+Con esos dos arreglos, VideoARM solo en `shot` sube de 39% a 57%. Pero de paso `goal` se
+desploma de 58% a 33% -- la pregunta fija enmarca todo como "¿es un SHOT...?" con el gol como
+cláusula subordinada, y ese sesgo contamina hasta los goles inequívocos. Se probó la corrección
+obvia: dar a las tres opciones (`goal`/`shot`/ninguno) el mismo peso gramatical con un a/b/c
+explícito. **Empeoró todo** (`shot` 57%->36%, `goal` solo recupera a 42%) -- el modelo de 9B
+no maneja bien la instrucción más larga/con más opciones, mismo patrón que la vez anterior que
+se probaron definiciones largas por etiqueta en el prompt principal.
+
+La resolución fue mirar el HÍBRIDO, no VideoARM aislado: el híbrido con la pregunta "sesgada"
+da 69%, con la balanceada 59% -- **la pregunta sesgada es la mejor, pese a hundir el `goal`
+standalone de VideoARM**, porque en el híbrido VideoARM casi nunca ve un gol claro (el directo
+ya se lo queda antes de escalar). Lo que importa no es que VideoARM sea bueno en las dos
+clases, es que sea lo mejor posible en el residuo que de verdad le llega -- mayoritariamente
+`shot`. Config final: pregunta "sesgada" + `clip_analyzer` forzado (ver `_CLIP_ANALYZER_QUESTION`
+en `core/events_vllm.py`, con el razonamiento completo en su comentario).
+
+También se comprobó y descartó filtrar el enrutado del híbrido por la confianza que reporta el
+propio modelo: en clips de `shot` mal clasificados como `goal` (falsos positivos, 5/33) la
+confianza es 0,90-0,98, IGUAL que en los goles reales acertados. Mal calibrado, sin señal ahí.
+
+Con 61 clips (un solo split, sin validación cruzada) esto no es un veredicto cerrado, pero el
+salto (44-51% -> 66% -> 69%) es demasiado grande para ser ruido de muestra, y se ha conseguido
+DOS veces sin tocar el tamaño del modelo -- ambas veces el techo resultó ser un bug o una
+elección de prompt, no capacidad del modelo. Eso pesa en contra de que **escalar a un modelo
+más grande (Qwen3.8-27B) sea la palanca con más retorno ahora mismo** -- sigue habiendo
+estructura barata sin explorar (ver más abajo) y en esta 4090 de 24 GB el 27B solo cabría
+cuantizado a int4 (comunidad, sin garantía de calidad), ocupando la tarjeta entera.
+
+Ideas para seguir sin tocar el modelo, sin probar todavía:
+- `shot` en la rama VideoARM del híbrido sigue en 50% -- mirar clip a clip qué le sigue
+  fallando (¿rango de frames mal elegido por el agente? ¿el ángulo de cámara no deja ver si
+  entra?) antes de seguir puliendo el texto de la pregunta a ciegas.
+- Subir `total_frames_limit`/`frame_analysis_max_frames` juntos con
+  `--limit-mm-per-prompt` en el servidor, para no perder el instante exacto del disparo.
+- Probar si dar al híbrido un tercer nivel -- confiar también en `shot` del directo cuando
+  venga con alta confianza, no reconsultar siempre -- cambia el balance latencia/precisión.
+
+### Tres incompatibilidades VideoARM ↔ Qwen3.5 (medidas, no teóricas)
+
+VideoARM está escrito contra o3 + GPT-4.1. Servirlo con Qwen3.5 destapa tres cosas que
+merecen quedar escritas, porque las tres se manifiestan como "el backend no clasifica nada"
+y ninguna da un error obvio:
+
+**1. Qwen3.5 es un modelo *thinking* y VideoARM nunca manda `max_tokens`.** Su
+`call_openai_model_with_tools` acepta el argumento pero no lo mete en el payload, así que el
+techo real de generación es `max_model_len` entero. Con el modo thinking por defecto, un clip
+de 4,6 s tardó **4 min 30 s**, casi todo cadena de razonamiento. Con
+`--default-chat-template-kwargs '{"enable_thinking": false}'` (lo que hace el script) el mismo
+clip baja a **~5 s**. A escala de partido completo la diferencia es entre inviable y viable.
+
+**2. Fuera de la primera iteración, Qwen3.5 escribe mal sus propias llamadas a tools.**
+VideoARM usa `tool_choice="required"` solo en la iteración 1; a partir de la 2 pasa a `"auto"`.
+Con `required` el servidor restringe la gramática y el tool call sale bien formado; con `auto`,
+sin restringir, el modelo emite `<=clip_analyzer` en vez de `<function=clip_analyzer>`. El
+parser no lo reconoce, así que VideoARM lo interpreta como "no ha llamado a ninguna tool" y se
+traga ese texto como **respuesta final**. Medido sobre 12 clips con `max_iterations=4`: **9
+respuestas ilegibles**. De ahí que `max_iterations` valga **1** por defecto — no por ahorrar,
+sino para quedarse solo en el tramo restringido y dejar que la respuesta la redacte
+`_force_final_answer`, que va sin tools.
+
+**3. `_force_final_answer` manda un mensaje `system` al final, y Qwen3.5 lo rechaza.**
+La plantilla de chat del modelo responde `400 {"message": "System message must be at the
+beginning."}`, VideoARM se come el error y devuelve el literal *"Maximum iterations reached
+without a conclusive answer."*. Como con `max_iterations=1` ese es el camino que da **siempre**
+la respuesta, sin arreglarlo el backend no clasifica ni un clip. `core/events_vllm.py` lo parchea
+con una subclase mínima (`_build_agent_class`) que manda esa misma instrucción con rol `user`;
+se hace por subclase y no forkeando el paquete para que actualizar `videoarm` siga siendo un
+`pip install -U`.
+
+### Sobre el audio (`audio_transcriber`)
+
+VideoARM tiene una tercera herramienta, `audio_transcriber`, que apunta a `whisper-1` —
+detrás de nuestro servidor vLLM no hay ningún `/v1/audio/transcriptions`. **No hace falta
+desactivarla**: el propio agente hace `ffprobe` del stream de audio *antes* de llamar a la
+API y, si no hay, devuelve `{"status": "no_audio"}` sin tocar la red y marca
+`video_has_audio=False`, lo que inyecta un "Do not call audio_transcriber" en las
+iteraciones siguientes. Por eso `predict_window` recorta **sin** pista de audio (`-an`):
+garantiza ese camino, y como mucho se desperdicia una iteración.
+
 ## Uso — acciones de balón: pase/regate/cabeceo/saque (`core/ball_actions.py`, R3D-18)
 
 Complementa a `core/events.py` con un paradigma distinto: en vez de clasificar un clip

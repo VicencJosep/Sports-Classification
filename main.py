@@ -41,6 +41,7 @@ import config
 if TYPE_CHECKING:
     from core.ball_actions import BallActionClassifier
     from core.events import EventClassifier
+    from core.events_vllm import DirectVLMEventClassifier, HybridEventClassifier, VideoARMEventClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +57,46 @@ def _build_ball_action_classifier(
 
 
 def _build_event_classifier(
-    cfg: config.PipelineConfig, device: Optional[str], skip: bool
-) -> Optional["EventClassifier"]:
+    cfg: config.PipelineConfig, device: Optional[str], skip: bool, backend: str = "vjepa2"
+) -> Optional["EventClassifier | VideoARMEventClassifier | DirectVLMEventClassifier | HybridEventClassifier"]:
+    """Construye el clasificador de eventos del backend pedido.
+
+    Los cuatro backends son intercambiables porque exponen el mismo contrato
+    (``predict``/``predict_window`` -> ``EventPrediction``); ``analytics.engine``
+    los consume de forma duck-typed y no distingue cuál recibe.
+
+      vjepa2   V-JEPA2 + SVC in-process (core/events.py). Usa la GPU local y
+               ``--device``, y devuelve las 16 clases del SVC entrenado.
+      videoarm VideoARM + Qwen3.5-9B hablando con un servidor vLLM aparte
+               (core/events_vllm.py). NO usa la GPU de este proceso, así que
+               ``--device`` no aplica; requiere el servidor arrancado
+               (``scripts/serve_events_vllm.sh``) y devuelve 9 eventos +
+               "background".
+      direct   Mismo Qwen3.5-9B/vLLM, SIN VideoARM (un mensaje, N frames, sin
+               tool-calling). Ver ``DirectVLMEventClassifier``.
+      hybrid   direct primero; si predice "goal" se confía, si no se
+               reconsulta con videoarm. El MEJOR medido con diferencia sobre
+               goal/shot (66% vs 44-51% de los otros tres, ver README § "¿Aporta
+               valor VideoARM?") -- backend recomendado si se usa este módulo.
+    """
     if skip:
         return None
+
+    if backend in ("videoarm", "direct", "hybrid"):
+        from core.events_vllm import DirectVLMEventClassifier, HybridEventClassifier, VideoARMEventClassifier
+
+        vcfg = cfg.videoarm_events
+        common = dict(base_url=vcfg.base_url, model_id=vcfg.model_id, api_key=vcfg.api_key)
+        if backend == "videoarm":
+            return VideoARMEventClassifier(
+                max_iterations=vcfg.max_iterations, total_frames_limit=vcfg.total_frames_limit, **common
+            )
+        if backend == "direct":
+            return DirectVLMEventClassifier(**common)
+        return HybridEventClassifier(
+            max_iterations=vcfg.max_iterations, total_frames_limit=vcfg.total_frames_limit, **common
+        )
+
     from core.events import EventClassifier
 
     return EventClassifier(
@@ -193,7 +230,9 @@ def _run_clip(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
     _run_homography(args.source, tracks_path, output_dir, cfg, args)
 
     ball_action_classifier = _build_ball_action_classifier(cfg, args.device, args.skip_ball_actions)
-    event_classifier = _build_event_classifier(cfg, args.device, args.skip_events)
+    event_classifier = _build_event_classifier(
+        cfg, args.device, args.skip_events, backend=args.events_backend
+    )
 
     telemetry, possession_records = analyze_match(
         source_video=args.source,
@@ -288,7 +327,9 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
     output_dir.mkdir(parents=True, exist_ok=True)
 
     ball_action_classifier = _build_ball_action_classifier(cfg, args.device, args.skip_ball_actions)
-    event_classifier = _build_event_classifier(cfg, args.device, args.skip_events)
+    event_classifier = _build_event_classifier(
+        cfg, args.device, args.skip_events, backend=args.events_backend
+    )
 
     telemetry, tracks_path, possessor_by_frame = analyze_full_match(
         source_video=args.source,
@@ -349,6 +390,12 @@ def main() -> None:
     parser.add_argument("--skip-classification", action="store_true", help="No asignar equipos (team_by_tracker_id=None)")
     parser.add_argument("--skip-ball-actions", action="store_true")
     parser.add_argument("--skip-events", action="store_true")
+    parser.add_argument("--events-backend", choices=["vjepa2", "videoarm", "direct", "hybrid"], default="vjepa2",
+                        help="Clasificador de eventos: 'vjepa2' (core/events.py, in-process, "
+                             "por defecto) o los tres de core/events_vllm.py -- requieren el "
+                             "servidor vLLM arrancado (scripts/serve_events_vllm.sh): 'videoarm' "
+                             "(orquestador), 'direct' (mismo modelo sin VideoARM), 'hybrid' "
+                             "(el mejor medido sobre goal/shot, ver README)")
     parser.add_argument("--skip-homography", action="store_true",
                         help="No calibrar el campo (sin tracks_2d.jsonl ni radar.mp4)")
     parser.add_argument("--homography-stride", type=int, default=None,
