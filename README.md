@@ -542,6 +542,21 @@ También se comprobó y descartó filtrar el enrutado del híbrido por la confia
 propio modelo: en clips de `shot` mal clasificados como `goal` (falsos positivos, 5/33) la
 confianza es 0,90-0,98, IGUAL que en los goles reales acertados. Mal calibrado, sin señal ahí.
 
+**Importante — varianza de ejecución a ejecución.** El 69% de arriba sale de combinar dos JSONL
+calculados por separado (directo de una pasada, VideoARM de otra). Al correr el híbrido REAL de
+punta a punta en una sola pasada sobre los mismos 61 clips: **61%** (`goal` 85%, `shot` 32%,
+frente al 50% de la combinación). El enrutado escaló el mismo número de clips (29/61) las dos
+veces, así que la diferencia está en lo que responde VideoARM para esos clips concretos, no en
+el enrutado. Es esperable en parte: el agente elige él mismo qué rango de frames analizar en
+`clip_analyzer`, así que dos pasadas no ven necesariamente la misma evidencia aunque la pregunta
+esté fijada; y vLLM con `temperature=0.0` bajo batching continuo no es estrictamente
+determinista bit a bit. **Conclusión honesta: el número real está en un rango, no es un punto
+fijo** -- algo entre 61% y 69% según la tirada, siempre claramente por encima de los tres
+backends individuales (44-51%), pero sin la precisión de dos cifras que sugeriría un solo run.
+Esto también es relevante para el propio experimento: la diferencia entre la pregunta "sesgada"
+(69%/61%) y la balanceada a/b/c (59%, un solo run) podría estar parcialmente inflada por esta
+misma varianza -- no se ha vuelto a correr la balanceada una segunda vez para comprobarlo.
+
 Con 61 clips (un solo split, sin validación cruzada) esto no es un veredicto cerrado, pero el
 salto (44-51% -> 66% -> 69%) es demasiado grande para ser ruido de muestra, y se ha conseguido
 DOS veces sin tocar el tamaño del modelo -- ambas veces el techo resultó ser un bug o una
