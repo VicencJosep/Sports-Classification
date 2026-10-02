@@ -1,0 +1,12 @@
+/mnt/datasets/SoccerNet/spain_laliga/2015-2016/2016-03-02 - 23-00 Levante 1 - 3 Real Madrid/1_720p.mkv
+/mnt/datasets/SoccerNet/spain_laliga/2015-2016/2016-03-02 - 23-00 Levante 1 - 3 Real Madrid/2_720p.mkv
+/mnt/datasets/SoccerNet/italy_serie-a/2016-2017/2016-12-04 - 17-00 Lazio 0 - 2 AS Roma/1_720p.mkv
+/mnt/datasets/SoccerNet/italy_serie-a/2016-2017/2016-12-04 - 17-00 Lazio 0 - 2 AS Roma/2_720p.mkv
+/mnt/datasets/SoccerNet/germany_bundesliga/2014-2015/2015-05-09 - 16-30 Bayern Munich 0 - 1 FC Augsburg/1_720p.mkv
+/mnt/datasets/SoccerNet/germany_bundesliga/2014-2015/2015-05-09 - 16-30 Bayern Munich 0 - 1 FC Augsburg/2_720p.mkv
+/mnt/datasets/SoccerNet/france_ligue-1/2016-2017/2016-11-30 - 23-00 Paris SG 2 - 0 Angers/1_720p.mkv
+/mnt/datasets/SoccerNet/france_ligue-1/2016-2017/2016-11-30 - 23-00 Paris SG 2 - 0 Angers/2_720p.mkv
+/mnt/datasets/SoccerNet/england_epl/2016-2017/2017-01-21 - 15-30 Liverpool 2 - 3 Swansea/1_720p.mkv
+/mnt/datasets/SoccerNet/england_epl/2016-2017/2017-01-21 - 15-30 Liverpool 2 - 3 Swansea/2_720p.mkv
+/mnt/datasets/SoccerNet/europe_uefa-champions-league/2016-2017/2016-11-23 - 22-45 Arsenal 2 - 2 Paris SG/1_720p.mkv
+/mnt/datasets/SoccerNet/europe_uefa-champions-league/2016-2017/2016-11-23 - 22-45 Arsenal 2 - 2 Paris SG/2_720p.mkv

@@ -43,10 +43,14 @@ Sports-Classification/
 │   ├── homography.py          # ✅ Calibración del campo (PnLCalib) → matriz H → tracks_2d.jsonl + radar
 │   ├── classification.py      # ✅ Asignación de equipo (PRTReId + K-Means, 2 clusters); dorsal (ViT OCR) pendiente
 │   ├── events.py              # ✅ Inferencia de eventos (V-JEPA2 + SVC) sobre un clip .mp4
+│   ├── spotting.py            # ✅ Probabilidades por ventana -> eventos puntuales (picos + NMS por clase)
 │   └── ball_actions.py        # ✅ Inferencia de pase/regate/entrada (R3D-18) sobre ventana T=32
 ├── scripts/
 │   ├── download_ball_action_data.py    # ✅ Descarga SoccerNet (Ball Action Spotting + labels públicas)
-│   └── extract_ball_action_clips.py    # ✅ tracking+posesión -> clips T=32 etiquetados
+│   ├── extract_ball_action_clips.py    # ✅ tracking+posesión -> clips T=32 etiquetados
+│   ├── scan_event_windows.py           # ✅ Escaneo de partido completo -> caché de probabilidades por ventana
+│   ├── evaluate_spotting.py            # ✅ Eventos puntuales vs GT SoccerNet (±tol, 1 a 1, barrido de umbral)
+│   └── verify_shot_candidates.py       # ✅ Candidatos a tiro de V-JEPA2 -> verificador VLM (Qwen3.5-9B)
 ├── training/
 │   └── train_ball_actions.py  # ✅ Fine-tuning R3D-18 sobre los clips extraídos
 ├── analytics/
@@ -742,6 +746,66 @@ no divergir entre entrenamiento e inferencia).
 ```bash
 python -m core.ball_actions --source dataset_ball_actions/pass/algun_clip.mp4
 ```
+
+## Uso — detección puntual de tiros y acciones de balón (`core/ball_spotting.py`, T-DEED)
+
+En partido completo (`--mode full-match`), los tiros/goles y el *instante* de cada acción de balón
+salen de [T-DEED](https://github.com/arturxe2/T-DEED) (GPL-3.0, ganador de SoccerNet Ball Action
+Spotting 2024), que da una probabilidad por frame para 12 clases (PASS, DRIVE, HEADER, HIGH PASS,
+OUT, CROSS, THROW IN, SHOT, BALL PLAYER BLOCK, PLAYER SUCCESSFUL TACKLE, FREE KICK, GOAL).
+
+### Instalación (`models/` no se versiona)
+
+```bash
+git clone https://github.com/arturxe2/T-DEED.git models/tdeed/T-DEED
+pip install gdown
+# Pesos (carpeta de Google Drive enlazada en el README de T-DEED):
+gdown 1uCWam8EhAXt3z6QQAfhRfzHITUcml438 -O models/tdeed/SoccerNetBall_challenge2/checkpoint_best.pt
+gdown 1b7REo4_Cota8SWPSmtdSEfbVNXNgziX6 -O models/tdeed/SoccerNetBall_test/checkpoint_best.pt
+```
+
+`SoccerNetBall_challenge2` (RegNetY-800MF, entrenado con 6 de los 7 partidos EFL) es el de
+producción (`config.BallSpottingConfig.model_name`). `SoccerNetBall_test` (RegNetY-200MF, split
+train) solo sirve para evaluar limpio en Middlesbrough, Stoke y Reading.
+
+### Uso
+
+```bash
+# Standalone: lista los tiros/goles de un partido (escanea y cachea junto al vídeo, ~9-15 min)
+python -m core.ball_spotting --source partido.mp4 --classes SHOT GOAL
+
+# En el pipeline (valores por defecto):
+python -m main --mode full-match --source partido.mp4 --output-dir output/x \
+    --shot-backend tdeed --ball-actions-trigger tdeed --ball-actions-label combined
+```
+
+* `--shot-backend tdeed|events`: `tdeed` (por defecto) saca shot/goal de T-DEED; el resto de
+  eventos sigue saliendo de `--events-backend`. `events` es el comportamiento anterior.
+* `--ball-actions-trigger tdeed|possession`: cuándo hay una acción de balón. Con `tdeed` (por
+  defecto) cada acción detectada por T-DEED; el jugador sale siempre de `core/possession.py`.
+* `--ball-actions-label combined|classifier|spotter`: quién pone la etiqueta (R3D-18 y T-DEED
+  combinados, solo el R3D-18, o solo T-DEED).
+
+### Qué esperar (medido, partido completo)
+
+| Tiros | AP ±3 s | P / R |
+|---|---|---|
+| V-JEPA2 + SVC, etiqueta ganadora por ventana (antes) | 31,6% | 29% / 73% |
+| V-JEPA2 + SVC, picos por clase (`core/spotting.py`) | 34,5% | 26% / 70% |
+| T-DEED `SoccerNetBall_test`, 3 partidos EFL no vistos (69 tiros) | 75,6% | 74% / 70% |
+| T-DEED `SoccerNetBall_challenge2`, 6 partidos SoccerNet-v2 de otras ligas (130 tiros) | 78,0% | 65% / 84% (umbral 0,3) |
+
+| Acciones de balón, `ground_truth/` (367 acciones, ±1 s) | P | R | F1 |
+|---|---|---|---|
+| Disparo por cambio de posesión + etiqueta R3D-18 (antes) | 28% | 57% | 38% |
+| Disparo T-DEED + etiqueta R3D-18 | 80% | 80% | 80% |
+| Disparo T-DEED + etiqueta combinada (por defecto) | 87% | 88% | 88% |
+| Disparo T-DEED + etiqueta T-DEED | 90% | 92% | 91% |
+
+Un verificador VLM sobre los candidatos (Qwen3.5-9B con frames o vídeo, con y sin razonamiento;
+VideoARM; Qwen3-Omni-30B) NO separa tiros de centros (AUC 0,49-0,63 sobre 150 candidatos
+difíciles): queda en el código (`ShotVerifier`, `scripts/verify_shot_candidates.py`) pero no se
+usa. Los scripts de todas estas mediciones están en `scripts/shot_benchmark/`.
 
 ## Uso — composición final (`analytics/engine.py`)
 

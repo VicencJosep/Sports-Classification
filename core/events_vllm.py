@@ -56,14 +56,18 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import math
 import os
 import re
 import subprocess
 import tempfile
 import time
 from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterator, Optional, Sequence
+
+import numpy as np
 
 from core.events import EventPrediction  # reutilizado, no duplicado
 
@@ -707,6 +711,234 @@ class HybridEventClassifier:
     def predict_many(self, video_paths: Sequence[Path | str]) -> Iterator[EventPrediction]:
         for video_path in video_paths:
             yield self.predict(video_path)
+
+
+# --------------------------------------------------------------------------- #
+#  Verificador de tiros (cascada de partido completo)
+# --------------------------------------------------------------------------- #
+
+# Pregunta 1: binaria y corta. Las definiciones largas por etiqueta ya
+# empeoraron dos veces al 9B (ver _QUESTION y _CLIP_ANALYZER_QUESTION); aquí
+# solo se nombran los falsos positivos MEDIDOS de V-JEPA2 en partido
+# completo (Hull–Sheffield W.: centros, balones fuera, bloqueos, cabezazos
+# que no van a puerta), que son justo los candidatos que este verificador
+# tiene que tumbar.
+_SHOT_QUESTION = (
+    "These frames are from a football (soccer) broadcast, in chronological "
+    "order. Does a player take a shot at goal in them (striking or heading "
+    "the ball towards the goal, trying to score)? Crosses, passes into the "
+    "box, clearances and balls going out of play are not shots. "
+    "Answer with one word: yes or no."
+)
+_SHOT_ANSWERS: tuple[str, ...] = ("yes", "no")
+
+# Pregunta 2 (solo si hay tiro): el desenlace. "goal" emite también el tiro
+# (convención gol ⊂ tiro de SoccerNet, ver core/spotting.py).
+_OUTCOME_QUESTION = (
+    "These frames are from a football (soccer) broadcast, in chronological "
+    "order, and a player takes a shot at goal in them. What happens to the "
+    "shot? goal: the ball ends up in the net. saved: the goalkeeper stops "
+    "it. blocked: a defender blocks it. missed: it goes wide or over. "
+    "Answer with one word: goal, saved, blocked or missed."
+)
+SHOT_OUTCOMES: tuple[str, ...] = ("goal", "saved", "blocked", "missed")
+
+# Entra en el nombre de la caché de veredictos: cambiar cualquiera de las dos
+# preguntas o el muestreo de frames exige subirla, o se mezclarían respuestas
+# de prompts distintos.
+SHOT_VERIFIER_PROMPT_VERSION: str = "v1"
+
+# Por debajo de esta masa de probabilidad en respuestas válidas, el modelo no
+# está siguiendo el formato "una palabra" y el P(sí) normalizado no es fiable.
+_MIN_ANSWER_MASS: float = 0.5
+
+
+@dataclass
+class ShotVerdict:
+    """Respuesta del verificador para un instante candidato."""
+
+    t_s: float
+    p_shot: float                    # P("yes") normalizada sobre yes/no
+    outcome: Optional[str]           # None si p_shot < outcome_min_p_shot
+    outcome_probs: dict[str, float]  # vacío si no se preguntó el desenlace
+    answer_mass: float               # prob. total en respuestas válidas (1er token)
+
+    def to_telemetry(self) -> dict:
+        return asdict(self)
+
+
+def _choice_probs(top_logprobs, choices: Sequence[str]) -> tuple[dict[str, float], float]:
+    """Probabilidad de cada opción a partir del PRIMER token generado.
+
+    Suma la probabilidad de todas las variantes de token que abren una sola
+    opción ("Yes", " yes", "yes."...) y normaliza entre opciones. Devuelve
+    también la masa total cubierta, para detectar cuándo el modelo no está
+    respondiendo con una de las palabras pedidas.
+
+    Se hace así, y no con salidas estructuradas de vLLM, porque el nombre de
+    ese parámetro ha cambiado entre versiones (``guided_choice`` ->
+    ``structured_outputs``); ``logprobs``/``top_logprobs`` son API OpenAI
+    estándar.
+    """
+    mass = {c: 0.0 for c in choices}
+    for entry in top_logprobs:
+        tok = entry.token.strip().lower()
+        if not tok:
+            continue
+        owners = [c for c in choices if c.startswith(tok) or tok.startswith(c)]
+        if len(owners) == 1:
+            mass[owners[0]] += math.exp(entry.logprob)
+    total = sum(mass.values())
+    if total == 0:
+        return {c: 1 / len(choices) for c in choices}, 0.0
+    return {c: m / total for c, m in mass.items()}, total
+
+
+class ShotVerifier:
+    """Segunda etapa de la cascada de partido completo: V-JEPA2 propone
+    instantes candidatos a tiro (picos de ``core/spotting.py`` con umbral
+    bajo) y este verificador los confirma o los tumba mirando el clip
+    alrededor de cada uno.
+
+    Mismo Qwen3.5-9B/vLLM que ``DirectVLMEventClassifier``, sin VideoARM, con
+    tres diferencias pensadas para lo medido:
+
+    * Pregunta binaria ("¿hay un tiro?") y, solo si la respuesta es sí, una
+      segunda pregunta por el desenlace -- en vez de una clasificación entre
+      10 etiquetas donde el fallo dominante era confundir desenlaces
+      (shot_off_target -> goal).
+    * Una sola palabra de respuesta (``max_tokens=1``) y su probabilidad del
+      primer token como score continuo, en vez de la confianza que el modelo
+      escribe él mismo (0,90-0,98 tanto en aciertos como en errores, ver
+      ``HybridEventClassifier``). Con un score así se puede ajustar un
+      umbral. Llamada directa a temperatura 0: sin agente que elija qué
+      frames mirar, que es de donde venía la varianza entre pasadas.
+    * Clip asimétrico ``[t - before_s, t + after_s]`` para que se vea el
+      desenlace (parada, balón en la red, reacción), con la mitad de los
+      frames concentrados en ``t ± dense_half_s`` (el golpeo) y la otra
+      mitad repartida por todo el clip. 8 + 8 = 16, el límite de imágenes
+      por prompt del servidor (``--limit-mm-per-prompt``).
+    """
+
+    def __init__(
+        self,
+        base_url: str = DEFAULT_BASE_URL,
+        model_id: str = DEFAULT_MODEL_ID,
+        api_key: str = DEFAULT_API_KEY,
+        before_s: float = 3.0,
+        after_s: float = 5.0,
+        dense_half_s: float = 1.0,
+        n_dense: int = 8,
+        n_context: int = 8,
+        outcome_min_p_shot: float = 0.5,
+    ) -> None:
+        from openai import OpenAI
+
+        self.model_id = model_id
+        self.before_s = before_s
+        self.after_s = after_s
+        self.dense_half_s = dense_half_s
+        self.n_dense = n_dense
+        self.n_context = n_context
+        self.outcome_min_p_shot = outcome_min_p_shot
+        self._client = OpenAI(base_url=base_url, api_key=api_key)
+
+    def verify(self, video_path: Path | str, t_s: float) -> ShotVerdict:
+        """¿Hay un tiro en torno a ``t_s``? Y si lo hay, ¿cómo acaba?"""
+        frames = self._frames_around(Path(video_path), t_s)
+        probs, mass = self._ask_choice(frames, _SHOT_QUESTION, _SHOT_ANSWERS)
+        p_shot = probs["yes"]
+
+        outcome: Optional[str] = None
+        outcome_probs: dict[str, float] = {}
+        if p_shot >= self.outcome_min_p_shot:
+            outcome_probs, _ = self._ask_choice(frames, _OUTCOME_QUESTION, SHOT_OUTCOMES)
+            outcome = max(outcome_probs, key=outcome_probs.get)
+
+        return ShotVerdict(
+            t_s=t_s, p_shot=p_shot, outcome=outcome, outcome_probs=outcome_probs, answer_mass=mass
+        )
+
+    def p_shot_window(self, video_path: Path | str, start_s: float, end_s: float) -> float:
+        """Solo la pregunta binaria sobre una ventana con frames uniformes.
+        Para usar el VLM como ESCÁNER (``VLMShotWindowClassifier``) y medir
+        qué tiros ve que V-JEPA2 no propone."""
+        from core.events import sample_frames_window
+
+        frames = sample_frames_window(
+            Path(video_path), start_s, end_s, self.n_dense + self.n_context
+        )
+        probs, _ = self._ask_choice(frames, _SHOT_QUESTION, _SHOT_ANSWERS)
+        return probs["yes"]
+
+    def frame_times(self, t_s: float) -> list[float]:
+        """Instantes muestreados alrededor de ``t_s``, en orden: ``n_dense``
+        en ``t ± dense_half_s`` y ``n_context`` FUERA de ese tramo, repartidos
+        antes/después en proporción a la duración de cada lado (sin
+        solaparse con los densos: si no, algunos saldrían duplicados)."""
+        start = max(0.0, t_s - self.before_s)
+        end = t_s + self.after_s
+        dense_start = max(start, t_s - self.dense_half_s)
+        dense_end = min(end, t_s + self.dense_half_s)
+        before_len, after_len = dense_start - start, end - dense_end
+        n_before = round(self.n_context * before_len / (before_len + after_len)) if before_len + after_len else 0
+        n_after = self.n_context - n_before
+        before = np.linspace(start, dense_start, n_before + 1)[:-1] if n_before else []
+        after = np.linspace(dense_end, end, n_after + 1)[1:] if n_after else []
+        dense = np.linspace(dense_start, dense_end, self.n_dense)
+        return [float(t) for t in (*before, *dense, *after)]
+
+    def _frames_around(self, video_path: Path, t_s: float) -> list:
+        from core.events import sample_frames_at
+
+        return sample_frames_at(video_path, self.frame_times(t_s))
+
+    def _ask_choice(self, frames, question: str, choices: Sequence[str]) -> tuple[dict[str, float], float]:
+        # Imágenes primero y la pregunta al final: la instrucción "una palabra"
+        # es lo último que ve el modelo antes de generar ese único token.
+        content = [
+            {"type": "image_url", "image_url": {"url": _frame_to_data_url(f)}} for f in frames
+        ]
+        content.append({"type": "text", "text": question})
+
+        response = self._client.chat.completions.create(
+            model=self.model_id,
+            messages=[{"role": "user", "content": content}],
+            temperature=0.0,
+            max_tokens=1,
+            logprobs=True,
+            top_logprobs=20,
+        )
+        first = response.choices[0].logprobs.content[0]
+        probs, mass = _choice_probs(first.top_logprobs, choices)
+        if mass < _MIN_ANSWER_MASS:
+            logger.warning(
+                "Solo %.0f%% de la probabilidad en respuestas válidas %s (generó %r)",
+                100 * mass, list(choices), first.token,
+            )
+        return probs, mass
+
+
+class VLMShotWindowClassifier:
+    """Adaptador de ``ShotVerifier`` al contrato ``predict_window`` ->
+    ``EventPrediction``, para escanear un partido entero con el VLM
+    (``scripts/scan_event_windows.py --backend vlm-shot``) y comparar su
+    recall de tiros con el de V-JEPA2 sobre la misma evaluación. Solo emite
+    "shot" y "background"."""
+
+    def __init__(self, verifier: ShotVerifier) -> None:
+        self._verifier = verifier
+
+    def predict_window(self, video_path: Path | str, start_s: float, end_s: float) -> EventPrediction:
+        p = self._verifier.p_shot_window(video_path, start_s, end_s)
+        is_shot = p >= 0.5
+        return EventPrediction(
+            video_path=str(video_path),
+            label="shot" if is_shot else BACKGROUND_LABEL,
+            confidence=p if is_shot else 1 - p,
+            probabilities={"shot": p, BACKGROUND_LABEL: 1 - p},
+            is_background=not is_shot,
+        )
 
 
 # --------------------------------------------------------------------------- #

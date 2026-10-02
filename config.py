@@ -126,6 +126,30 @@ class BallActionsConfig:
 
 
 @dataclass(frozen=True)
+class BallSpottingConfig:
+    """Hiperparámetros de core/ball_spotting.py (T-DEED, detección puntual de
+    acciones de balón). Sustituye a core/events.py para shot/goal y, opcional,
+    al disparador por cambio de posesión de las acciones de balón.
+
+    Umbrales medidos (ver el docstring de core/ball_spotting.py):
+    ``shot_min_score=0.3`` -> P 65% / R 84% en 6 partidos SoccerNet-v2 de otras
+    ligas (0.5 -> P 75% / R 73%). ``action_min_score=0.5`` -> F1 90% en
+    ground_truth/ (0.3 -> 84%); elegido sobre ese mismo partido, así que es
+    algo optimista.
+    """
+
+    repo_dir: Path = PROJECT_ROOT / "models" / "tdeed" / "T-DEED"
+    checkpoints_dir: Path = PROJECT_ROOT / "models" / "tdeed"
+    model_name: str = "SoccerNetBall_challenge2"
+    shot_min_score: float = 0.3
+    goal_min_score: float = 0.3
+    event_nms_s: float = 4.0                # dos tiros a menos de 4 s son el mismo pico
+    event_smooth_frames: int = 6            # ~0,5 s (frames muestreados a 12,5 fps)
+    action_min_score: float = 0.5
+    action_nms_s: float = 0.5               # ~12 frames: acciones seguidas del mismo tipo
+
+
+@dataclass(frozen=True)
 class ClassificationConfig:
     """Hiperparámetros de core/classification.py (embeddings PRTReId + K-Means de equipos)."""
 
@@ -279,6 +303,7 @@ class PipelineConfig:
     events: EventsConfig = field(default_factory=EventsConfig)
     videoarm_events: VideoARMEventsConfig = field(default_factory=VideoARMEventsConfig)
     ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
+    ball_spotting: BallSpottingConfig = field(default_factory=BallSpottingConfig)
     classification: ClassificationConfig = field(default_factory=ClassificationConfig)
     homography: HomographyConfig = field(default_factory=HomographyConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)

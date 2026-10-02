@@ -320,6 +320,37 @@ def _run_publish(
         )
 
 
+def _build_spot_kwargs(args: argparse.Namespace, cfg: config.PipelineConfig) -> dict:
+    """Argumentos de T-DEED para ``analyze_full_match`` (vacío si no se usa).
+    Calcula la caché de probabilidades del vídeo si no existe y libera el
+    modelo antes de volver: el resto del pipeline necesita esa VRAM."""
+    use_for_events = args.shot_backend == "tdeed" and not args.skip_events
+    use_for_actions = args.ball_actions_trigger == "tdeed" and not args.skip_ball_actions
+    if not (use_for_events or use_for_actions):
+        return {}
+
+    from core.ball_spotting import TDEEDSpotter, read_scores, scores_cache_path
+
+    spot_cfg = cfg.ball_spotting
+    cache_path = scores_cache_path(args.source, spot_cfg.model_name)
+    if not cache_path.exists():
+        spotter = TDEEDSpotter(spot_cfg.model_name, spot_cfg.repo_dir, spot_cfg.checkpoints_dir)
+        spotter.ensure_scores(args.source, cache_path)
+        spotter.release()
+
+    kwargs: dict = {"spot_scores": read_scores(cache_path)}
+    if use_for_events:
+        kwargs["event_spot_params"] = {
+            "SHOT": (spot_cfg.shot_min_score, spot_cfg.event_nms_s),
+            "GOAL": (spot_cfg.goal_min_score, spot_cfg.event_nms_s),
+        }
+        kwargs["event_spot_smooth_frames"] = spot_cfg.event_smooth_frames
+    if use_for_actions:
+        kwargs["ball_action_spot_params"] = (spot_cfg.action_min_score, spot_cfg.action_nms_s)
+        kwargs["ball_action_label_source"] = args.ball_actions_label
+    return kwargs
+
+
 def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
     from analytics.engine import analyze_full_match, render_match_video
 
@@ -330,6 +361,8 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
     event_classifier = _build_event_classifier(
         cfg, args.device, args.skip_events, backend=args.events_backend
     )
+
+    spot_kwargs = _build_spot_kwargs(args, cfg)
 
     telemetry, tracks_path, possessor_by_frame = analyze_full_match(
         source_video=args.source,
@@ -343,6 +376,7 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
         min_window_fraction=cfg.full_match.min_window_fraction,
         ball_action_temporal_offsets_frames=cfg.ball_actions.temporal_offsets_frames,
         device=args.device,
+        **spot_kwargs,
     )
     logger.info(
         "Partido analizado: %d frames, %d cambios de posesión, %d tramos de evento",
@@ -390,6 +424,20 @@ def main() -> None:
     parser.add_argument("--skip-classification", action="store_true", help="No asignar equipos (team_by_tracker_id=None)")
     parser.add_argument("--skip-ball-actions", action="store_true")
     parser.add_argument("--skip-events", action="store_true")
+    parser.add_argument("--shot-backend", choices=["tdeed", "events"], default="tdeed",
+                        help="Solo --mode full-match. Quién detecta shot/goal: 'tdeed' "
+                             "(core/ball_spotting.py, por defecto: AP de tiros 75-78%% frente al "
+                             "~34%% de V-JEPA2; el resto de eventos sigue saliendo de "
+                             "--events-backend) o 'events' (todo de --events-backend, como antes)")
+    parser.add_argument("--ball-actions-trigger", choices=["tdeed", "possession"], default="tdeed",
+                        help="Solo --mode full-match. Cuándo hay una acción de balón: en cada "
+                             "acción detectada por T-DEED (por defecto; F1 88%% frente al 38%% del "
+                             "cambio de posesión en ground_truth/) o en cada cambio de posesión, "
+                             "como antes; el jugador sale siempre de la posesión")
+    parser.add_argument("--ball-actions-label", choices=["classifier", "spotter", "combined"],
+                        default="combined",
+                        help="Con --ball-actions-trigger tdeed, quién pone la etiqueta: el R3D-18 "
+                             "('classifier'), T-DEED ('spotter') o los dos ('combined')")
     parser.add_argument("--events-backend", choices=["vjepa2", "videoarm", "direct", "hybrid"], default="vjepa2",
                         help="Clasificador de eventos: 'vjepa2' (core/events.py, in-process, "
                              "por defecto) o los tres de core/events_vllm.py -- requieren el "

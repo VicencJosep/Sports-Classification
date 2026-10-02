@@ -151,6 +151,24 @@ def sample_frames_window(
     completo. ``sample_frames`` sigue existiendo tal cual para el flujo de
     clip corto.
     """
+    return _sample_range_at(video_path, start_s, end_s, np.linspace(start_s, end_s, num=n))
+
+
+def sample_frames_at(video_path: Path, times: Sequence[float]) -> list[np.ndarray]:
+    """Frames RGB en instantes arbitrarios (el decodificado más cercano a
+    cada uno), decodificando una sola vez el tramo ``[min, max]`` de
+    ``times``. Para muestreos no uniformes, p.ej. denso alrededor de un
+    instante y disperso en el contexto (``core.events_vllm.ShotVerifier``)."""
+    return _sample_range_at(video_path, float(min(times)), float(max(times)), times)
+
+
+def _sample_range_at(
+    video_path: Path, start_s: float, end_s: float, target_times: Sequence[float]
+) -> list[np.ndarray]:
+    """Seek al keyframe anterior a ``start_s``, decodifica hasta ``end_s`` y
+    devuelve, para cada instante de ``target_times``, el frame decodificado
+    más cercano por timestamp. Solo convierte a RGB los frames elegidos (no
+    los ~150 de una ventana de 6 s), antes de cerrar el contenedor."""
     import av
 
     container = av.open(str(video_path))
@@ -160,7 +178,7 @@ def sample_frames_window(
 
         container.seek(int(start_s / tb), stream=stream, backward=True, any_frame=False)
 
-        decoded: list[tuple[float, np.ndarray]] = []
+        decoded: list[tuple[float, "av.VideoFrame"]] = []
         for frame in container.decode(video=0):
             if frame.pts is None:
                 continue
@@ -169,16 +187,20 @@ def sample_frames_window(
                 continue  # el seek aterriza en el keyframe anterior, puede ser < start_s
             if ts > end_s:
                 break
-            decoded.append((ts, frame.to_ndarray(format="rgb24")))
+            decoded.append((ts, frame))
+
+        if not decoded:
+            raise ValueError(
+                f"No se pudo decodificar ningún frame de {video_path} en [{start_s}, {end_s}]"
+            )
+
+        decoded_times = np.array([t for t, _ in decoded])
+        picks = [int(np.argmin(np.abs(decoded_times - tt))) for tt in target_times]
+        rgb = {i: decoded[i][1].to_ndarray(format="rgb24") for i in set(picks)}
     finally:
         container.close()
 
-    if not decoded:
-        raise ValueError(
-            f"No se pudo decodificar ningún frame de {video_path} en [{start_s}, {end_s}]"
-        )
-
-    return _uniform_sample_by_time(decoded, start_s, end_s, n)
+    return [rgb[i] for i in picks]
 
 
 # --------------------------------------------------------------------------- #
