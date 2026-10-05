@@ -42,10 +42,12 @@ El F1 del Omni (65 %) es el de "aceptar todo": su precisión es la proporción d
 | V-JEPA2 + SVC, etiqueta ganadora por ventana (pipeline anterior) | 31,6 %* | 29 %* | 61* |
 | V-JEPA2 + SVC, picos por clase (`core/spotting.py`) | 34,5 % | 26 % | 64 |
 | V-JEPA2 → verificador Qwen3.5-9B (sí/no, 16 frames) | 22,8 % | 22 % | 76 |
-| V-JEPA2 → verificador VideoARM + Qwen3.5-9B | pendiente (`output/shot_benchmark/vlm_clean/videoarm.jsonl`) | | |
-| V-JEPA2 → verificador Qwen3-Omni-30B | pendiente (`vlm_clean/omni_video.jsonl`) | | |
+| V-JEPA2 → verificador VideoARM + Qwen3.5-9B (score = P(shot)+P(goal) de su JSON) | 14,2 % | 14 % | 149 |
+| V-JEPA2 → verificador Qwen3-Omni-30B | no ejecutado: el Omni reserva 22 GB de GPU y la comparten otros proyectos (dos intentos fallidos el 5 oct); `scripts/shot_benchmark/run_omni_clean.sh` lo lanza cuando esté libre | | |
 | V-JEPA2 → verificador T-DEED | 74,7 % | 74 % | 22 |
 | **T-DEED solo** (`SoccerNetBall_test`) | **75,6 %** | **74 %** | **23** |
+
+VideoARM con su propia etiqueta (shot∪goal ganadora): P 17 %, R 48 %, 63 alarmas por partido.
 
 \* medido sobre los 7 EFL (`output/shot_benchmark/vjepa2_efl.txt`), no sobre los 3 limpios.
 T-DEED además localiza el tiro con precisión de ±1 s (AP ±1 s 70,0 %; V-JEPA2: 6,3 %).
@@ -135,11 +137,50 @@ Demos: `output/tdeed_demo/final.mp4` (20 min de Middlesbrough con banners),
 `output/tdeed_demo/tiros_Stoke_SoccerNetBall_test.mp4` (un clip por detección en un partido no visto:
 20 detecciones, 15 aciertos, 5 falsas alarmas, 6 tiros no detectados de 21).
 
-## 9. Pendiente
+## 9. Viabilidad en vídeo panorámico (SoccerTrack v2, 5 oct 2026)
 
-- Rellenar las dos filas de VideoARM y Omni en §2b.
+Partido 117093 (universitario, cámara panorámica fija BePro, 4096×1080 a 25 fps), 1ª parte, tramo
+0–630 s (119 pases, 102 conducciones, 13 pases altos, 5 tiros, 4 centros…). Checkpoint `challenge2`,
+sin ningún ajuste. Scripts: `scripts/shot_benchmark/panorama_vcam.py`, `run_panorama_test.sh`,
+`panorama_eval.py`.
+
+**Resolución.** Un jugador mide 46 px de alto (mediana) en la panorámica; en la TV a 720p mide 84 px.
+T-DEED reescala su entrada a 796×448: con la panorámica entera los jugadores quedan en ~9 px; con un
+recorte de 1280×720 ("cámara virtual") en ~29 px (TV: ~52 px).
+
+**Cámara virtual.** El balón del dataset viene en metros (origen en el centro del campo). El fichero
+`raw/<id>_keypoints.json` da 65 puntos del campo con su píxel en el vídeo original; un spline
+thin-plate sobre ellos (residuo 0,1 px) convierte metros → píxeles (x+52,5, y+34, sin invertir y).
+El recorte 1280×720 sigue esa posición suavizada 1 s, con velocidad máxima de 40 px/frame. En
+producción no hay balón anotado: haría falta un detector de balón sobre la panorámica.
+
+| Clase (anotadas) | T-DEED sobre la panorámica entera, AP ±1 s | T-DEED sobre la cámara virtual, AP ±1 s | Referencia en TV |
+|---|---|---|---|
+| PASS (119) | 39 % | **78 %** | F1 92 % (`ground_truth/`) |
+| DRIVE (102) | 35 % | **76 %** | F1 88 % |
+| HIGH PASS (13) | 16 % | **75 %** | F1 91 % |
+| CROSS (4) | 0 % | 64 % | — |
+| THROW IN (8) | 37 % | 39 % | F1 86 % |
+| OUT (17) | 4 % | 31 % | — |
+| **SHOT (5)** | **0 %** (puntuación máxima 0,01) | **55 % solo con umbral 0,01**: la puntuación de SHOT en los 5 tiros es 0,02 / 0,20 / 0,01 / 0,02 / 0,01, y en el golpeo gana PASS o DRIVE. Con el umbral de producción (0,3) no emite ningún tiro | AP 75,6 % |
+
+Pipeline completo sobre la cámara virtual (tracking YOLO11x + posesión + T-DEED + R3D-18 combinado,
+umbral 0,5, ±1 s): 173 acciones, **P 79 %, R 56 %, F1 66 %** (en TV: 87 / 88 / 88 %). Cero tiros
+emitidos. El tracking funciona (jugadores de 46 px) y el render con `--trace-length 0` se ve limpio:
+`output/panorama_vcam/final.mp4`. Clips: `datasets/soccertrack-v2/clips/117093_1st_0-630{,_vcam}.mp4`.
+
+Conclusiones: (1) la panorámica entera no es viable con T-DEED tal cual; (2) la cámara virtual
+recupera pases, conducciones y pases altos a un nivel cercano al de TV, con menos confianza (los
+umbrales habría que bajarlos); (3) los tiros no: el modelo prácticamente no los ve (un solo tiro llega a 0,20; el resto ≤ 0,02) y
+en el golpeo los clasifica como pase o conducción, por el tamaño de los jugadores y del balón; (4) para tiros en panorámica hace falta
+ajuste fino con SoccerTrack v2 (21.000 acciones, 10 partidos) o una cámara virtual con más aumento,
+que no gana resolución real. Decisión pendiente del usuario.
+
+## 10. Pendiente
+
+- Fila del Omni en §2b (necesita la GPU entera).
 - Cuando T-DEED marca un tiro, la acción de balón de ese instante debe ser "tiro" (hoy sale "conducción").
 - Medir si el jugador asignado a cada acción es el correcto.
-- Viabilidad en vídeo panorámico (SoccerTrack v2, `datasets/soccertrack-v2/`): T-DEED tal cual y con "cámara virtual".
+- Panorámica: decidir entre ajuste fino con SoccerTrack v2 o descartar tiros en panorámica (ver §9); en producción haría falta un detector de balón para la cámara virtual.
 - Tarjetas, sustituciones y saque inicial: necesita anotar eventos en partidos propios.
 - Ajuste fino de T-DEED con datos propios cuando se sepa qué falla en producción.
