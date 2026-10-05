@@ -17,7 +17,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import numpy as np
 
-BENCH = Path("output/shot_benchmark/vlm_bench")
+import os
+BENCH = Path(os.environ.get("VLM_BENCH_DIR", "output/shot_benchmark/vlm_bench"))
 BEFORE_S, AFTER_S = 3.0, 5.0
 QWEN9B = dict(url="http://localhost:8010/v1", model="Qwen/Qwen3.5-9B")
 OMNI = dict(url="http://localhost:8002/v1", model="cyankiwi/Qwen3-Omni-30B-A3B-Thinking-AWQ-4bit")
