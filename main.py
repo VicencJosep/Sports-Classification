@@ -265,7 +265,7 @@ def _run_clip(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
             team_by_tracker_id=team_by_tracker_id,
             possessor_by_frame=possessor_by_frame,
             telemetry=telemetry,
-            trace_length=cfg.analytics.trace_length,
+            trace_length=cfg.analytics.trace_length if args.trace_length is None else args.trace_length,
             action_highlight_frames=cfg.analytics.action_highlight_frames,
         )
         logger.info("Vídeo final escrito en %s", final_path)
@@ -405,7 +405,7 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
             team_by_tracker_id=team_by_tracker_id,
             possessor_by_frame=possessor_by_frame,
             telemetry=telemetry,
-            trace_length=cfg.analytics.trace_length,
+            trace_length=cfg.analytics.trace_length if args.trace_length is None else args.trace_length,
             event_spans=telemetry.events,
             action_highlight_frames=cfg.analytics.action_highlight_frames,
         )
@@ -452,6 +452,9 @@ def main() -> None:
     parser.add_argument("--radar", action="store_true",
                         help="Escribe radar.mp4 (vista cenital) además de tracks_2d.jsonl")
     parser.add_argument("--skip-render", action="store_true", help="No escribir final.mp4, solo telemetry.json")
+    parser.add_argument("--trace-length", type=int, default=None,
+                        help="Frames de estela por jugador en el vídeo final (0 = solo el círculo, sin estela); "
+                             "por defecto config.AnalyticsConfig.trace_length")
     parser.add_argument("--publish", action="store_true",
                         help="Solo --mode clip: sube final.mp4 a YouTube Studio con "
                              "automation/molmo_publisher.py (requiere sesión de Google ya "
