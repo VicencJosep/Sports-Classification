@@ -1,5 +1,5 @@
 """Embedding V-JEPA2 (3072-d) de la ventana de cada candidato a tiro (picos θ>=0.02,
-NMS 4 s: los mismos que ve el verificador VLM). Comprueba que el SVC reproduce las
+NMS 4 s). Comprueba que el SVC reproduce las
 probabilidades de la caché. Reanudable por partido. Uso: python - [LIMIT] (prueba sin guardar)."""
 import glob, sys, time
 from pathlib import Path

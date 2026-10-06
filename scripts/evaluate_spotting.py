@@ -33,10 +33,6 @@ Uso (desde la raíz del proyecto, dentro del contenedor):
 
     # Tiros no detectados, con lo que vio el modelo en su ventana
     python -m scripts.evaluate_spotting --cache ... --list-missed
-
-    # Con los veredictos del VLM (scripts/verify_shot_candidates.py): añade el
-    # método "spot+VLM", puntuado con el P(tiro) del verificador
-    python -m scripts.evaluate_spotting --cache ... --verdicts
 """
 
 from __future__ import annotations
@@ -47,7 +43,6 @@ import logging
 import statistics
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from core.spotting import CURVE_COMPONENTS, class_curve, find_peaks
 
@@ -163,23 +158,6 @@ def predictions_merge(meta: dict, rows: list[dict], label: str) -> list[Predicti
     ]
 
 
-def predictions_verified(verdicts: list[dict], label: str) -> list[Prediction]:
-    """Candidatos verificados por el VLM. "shot": score = P(tiro) del
-    verificador. "goal": solo los que respondió "goal" como desenlace, con
-    score P(tiro) x P(goal)."""
-    preds = []
-    for v in verdicts:
-        t = v["t_s"]
-        if label == "shot":
-            score = v["p_shot"]
-        elif label == "goal" and v.get("outcome") == "goal":
-            score = v["p_shot"] * v["outcome_probs"]["goal"]
-        else:
-            continue
-        preds.append(Prediction(t_s=t, lo_s=t, hi_s=t, score=score))
-    return preds
-
-
 def predictions_spot(rows: list[dict], label: str, nms_s: float, offset_s: float) -> list[Prediction]:
     """Todos los picos de la curva de ``label`` (sin umbral: se barre después)."""
     times, scores = class_curve(rows, label)
@@ -292,7 +270,6 @@ class MatchData:
     meta: dict
     rows: list[dict]
     gt: dict[str, list[float]]
-    verdicts: Optional[list[dict]] = None
 
 
 def _pct(x: float) -> str:
@@ -345,12 +322,6 @@ def report(
         ]
         n_gt = sum(len(g) for g, _ in per_match_spot)
         th = _best_threshold(per_match_spot, MAIN_TOLERANCE_S)
-        with_verdicts = all(d.verdicts is not None for d in data)
-        per_match_ver = (
-            [(d.gt.get(label, []), predictions_verified(d.verdicts, label)) for d in data]
-            if with_verdicts else []
-        )
-        tau = _best_threshold(per_match_ver, MAIN_TOLERANCE_S) if with_verdicts else 0.0
 
         print(f"\n=== {label}  (GT: {n_gt} en {len(data)} partidos; spot: NMS ±{nms_s[label]:g}s, "
               f"offset {offset_s[label]:+g}s) ===")
@@ -360,12 +331,6 @@ def report(
             ("merge (actual)", per_match_merge, 0.0),
             (f"spot θ={th:.3f} (mejor F1)", per_match_spot, th),
         ]
-        if with_verdicts:
-            methods += [
-                ("candidatos al VLM", per_match_ver, 0.0),
-                (f"spot+VLM τ={tau:.3f}", per_match_ver, tau),
-            ]
-            cls_out["vlm_threshold_best_f1"] = tau
         for method, per_match, min_score in methods:
             for tol in tolerances:
                 total = Counts()
@@ -380,10 +345,6 @@ def report(
         ap_spot = average_precision(per_match_spot, MAIN_TOLERANCE_S)
         ap_line = f"AP ±{MAIN_TOLERANCE_S:g}s (sin umbral):  merge {_pct(ap_merge)}   spot {_pct(ap_spot)}"
         cls_out.update(ap_merge=ap_merge, ap_spot=ap_spot)
-        if with_verdicts:
-            ap_ver = average_precision(per_match_ver, MAIN_TOLERANCE_S)
-            ap_line += f"   spot+VLM {_pct(ap_ver)}"
-            cls_out["ap_verified"] = ap_ver
         print(ap_line)
 
         # Offset: instante real - instante predicho, sobre aciertos a ±5 s.
@@ -398,7 +359,7 @@ def report(
             cls_out["offset_median_s"] = statistics.median(diffs)
 
         # Barrido de umbral: coste (candidatos por partido) frente a recall.
-        print(f"\nBarrido spot ±{MAIN_TOLERANCE_S:g}s  (para elegir el umbral de candidatos del verificador)")
+        print(f"\nBarrido spot ±{MAIN_TOLERANCE_S:g}s  (para elegir el umbral de candidatos)")
         print(f"{'θ':>6}{'cand/partido':>14}{'recall':>9}{'precisión':>11}")
         cls_out["sweep"] = []
         for sweep_th in SWEEP_THRESHOLDS:
@@ -408,20 +369,6 @@ def report(
             print(f"{sweep_th:>6.2f}{total.n_pred / len(data):>14.1f}{_pct(total.recall):>9}{_pct(total.precision):>11}")
             cls_out["sweep"].append({"threshold": sweep_th, "pred_per_match": total.n_pred / len(data),
                                      "recall": total.recall, "precision": total.precision})
-
-        if with_verdicts:
-            print(f"\nBarrido spot+VLM ±{MAIN_TOLERANCE_S:g}s  (τ sobre el score del verificador; el recall "
-                  f"no puede superar el de los candidatos)")
-            print(f"{'τ':>6}{'pred/partido':>14}{'recall':>9}{'precisión':>11}")
-            cls_out["sweep_verified"] = []
-            for sweep_th in SWEEP_THRESHOLDS:
-                total = Counts()
-                for gt, preds in per_match_ver:
-                    total.add(count(gt, preds, MAIN_TOLERANCE_S, sweep_th))
-                print(f"{sweep_th:>6.2f}{total.n_pred / len(data):>14.1f}{_pct(total.recall):>9}"
-                      f"{_pct(total.precision):>11}")
-                cls_out["sweep_verified"].append({"threshold": sweep_th, "pred_per_match": total.n_pred / len(data),
-                                                  "recall": total.recall, "precision": total.precision})
 
         # Por partido, en el punto de mejor F1.
         print(f"\nPor partido (spot θ={th:.3f}, ±{MAIN_TOLERANCE_S:g}s)")
@@ -460,8 +407,6 @@ def main() -> None:
     parser.add_argument("--offset-shot", type=float, default=0.0)
     parser.add_argument("--offset-goal", type=float, default=0.0)
     parser.add_argument("--list-missed", action="store_true")
-    parser.add_argument("--verdicts", action="store_true",
-                        help="Añade el método spot+VLM con los veredictos de verify_shot_candidates")
     parser.add_argument("--json-out", type=Path, default=None)
     args = parser.parse_args()
 
@@ -473,16 +418,7 @@ def main() -> None:
         meta, rows = read_event_windows(cache)
         video = Path(meta["source_video"])
         gt, labels_path = load_ground_truth(video)
-        verdicts = None
-        if args.verdicts:
-            from core.events_vllm import SHOT_VERIFIER_PROMPT_VERSION
-            from scripts.verify_shot_candidates import read_verdicts, verdicts_path_for
-
-            verdicts_path = verdicts_path_for(cache, SHOT_VERIFIER_PROMPT_VERSION)
-            if not verdicts_path.exists():
-                parser.error(f"Sin veredictos para {cache} (esperaba {verdicts_path})")
-            verdicts = read_verdicts(verdicts_path)[1]
-        data.append(MatchData(name=video.parent.name, meta=meta, rows=rows, gt=gt, verdicts=verdicts))
+        data.append(MatchData(name=video.parent.name, meta=meta, rows=rows, gt=gt))
         logger.info("%s: %d ventanas, GT %s (%s)", video.parent.name, len(rows),
                     {k: len(v) for k, v in gt.items()}, labels_path.name)
 

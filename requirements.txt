@@ -92,26 +92,7 @@ SoccerNet==0.1.62
 pandas>=2.1.0               # Agregación de métricas y export
 tqdm
 
-# --- Orquestador de eventos (core/events_vllm.py: VideoARM + Qwen3.5-9B/vLLM) ---
-# VideoARM (MILVLG/videoarm) no se distribuye por PyPI y no tiene tag/release
-# fijado -- misma categoría de riesgo que prtreid/bpbreid más arriba ("HEAD de
-# main" es la única instalación documentada, sin versión que pinnear todavía).
-# El modelo (Qwen3.5-9B) NO se instala aquí: corre en un servidor vLLM aparte,
-# la imagen oficial vllm/vllm-openai:v0.28.0 que lanza
-# scripts/serve_events_vllm.sh (ver README § "Servir Qwen3.5-9B con vLLM").
-# Va en contenedor propio porque vLLM resuelve su propio torch/CUDA, y no
-# convive con los pines de torch==2.11.0+cu128 / transformers==5.14.1 de este
-# fichero. (Qwen3_5ForConditionalGeneration ya está en el registro de modelos
-# de las releases estables -- verificado en v0.26.0 y v0.28.0 --, así que NO
-# hace falta compilar la rama main como se creyó al abrir esta rama.)
-# Este proceso solo le habla por HTTP (requests, vía VideoARM) -- dependencias
-# ligeras, sin conflicto con el resto de este requirements.txt.
-git+https://github.com/MILVLG/videoarm.git
-openai>=1.0.0
-python-dotenv
-
-# Symphony (Haiyang0226/Symphony) quedó descartado como orquestador -- backends
-# hardcodeados a DeepSeek+Seed VL (APIs propietarias separadas para texto y
-# visión) en vez de un cliente OpenAI-compatible genérico, y espera subtítulos
-# + una BD de CLIP para retrieval que este proyecto no tiene. Ver plan de la
-# rama videoARM si se reconsidera más adelante.
+# --- Orquestador semántico (Q&A sobre vídeo) ---
+# NOTA: VideoARM / Symphony no se distribuyen por PyPI todavía.
+# Instalar desde su repositorio cuando se aborde orquestrator/agent.py:
+#   pip install git+https://github.com/<org>/videoarm.git

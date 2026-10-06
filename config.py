@@ -69,34 +69,6 @@ class EventsConfig:
 
 
 @dataclass(frozen=True)
-class VideoARMEventsConfig:
-    """Hiperparámetros de core/events_vllm.py (VideoARM + Qwen3.5-9B servido
-    con vLLM) -- backend alternativo a EventsConfig (V-JEPA2 + SVC).
-
-    A diferencia de EventsConfig, el modelo NO vive en este proceso: corre en
-    un SERVIDOR APARTE, la imagen oficial `vllm/vllm-openai` lanzada por
-    `scripts/serve_events_vllm.sh` (ver README § "Servir Qwen3.5-9B con
-    vLLM"). El aislamiento es el mismo motivo que el intérprete aparte de
-    MolmoWeb-4B (ver PublisherConfig.venv_python): vLLM resuelve su propio
-    torch/CUDA y no convive con los pines de requirements.txt. Este proceso
-    solo le habla por HTTP OpenAI-compatible; classifier_path/model_id/
-    num_frames de EventsConfig no aplican aquí -- base_url sí es el
-    equivalente de "dónde está el modelo".
-    """
-
-    base_url: str = "http://localhost:8010/v1"   # puerto de scripts/serve_events_vllm.sh
-    model_id: str = "Qwen/Qwen3.5-9B"       # debe coincidir con --served-model-name del servidor
-    api_key: str = "EMPTY"                  # vLLM no valida la key; VideoARM exige que exista
-    max_iterations: int = 2                 # ver core.events_vllm.DEFAULT_MAX_ITERATIONS -- el
-                                             # parche _Qwen35CompatAgent fuerza tool_choice=
-                                             # "required" en todas las iteraciones, así que 2 ya es
-                                             # seguro y deja entrar a clip_analyzer
-    total_frames_limit: int = 32            # VideoARM los manda en mosaicos de 2x3 -> ~6 imágenes
-                                             # por prompt; subirlo exige subir --limit-mm-per-prompt
-                                             # en scripts/serve_events_vllm.sh
-
-
-@dataclass(frozen=True)
 class BallActionsConfig:
     """Hiperparámetros de core/ball_actions.py (clasificador R3D-18 fine-tuned).
 
@@ -301,7 +273,6 @@ class PipelineConfig:
 
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
     events: EventsConfig = field(default_factory=EventsConfig)
-    videoarm_events: VideoARMEventsConfig = field(default_factory=VideoARMEventsConfig)
     ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
     ball_spotting: BallSpottingConfig = field(default_factory=BallSpottingConfig)
     classification: ClassificationConfig = field(default_factory=ClassificationConfig)

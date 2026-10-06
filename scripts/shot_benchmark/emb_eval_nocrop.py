@@ -1,6 +1,6 @@
 
 # --- ¿El recorte central de V-JEPA2 es el cuello de botella? Misma cabeza LOMO, tres vistas ---
-matches = load_matches(with_vlm=False, with_emb=True)  # "emb" = recorte central 256x256 (el de siempre)
+matches = load_matches(with_emb=True)  # "emb" = recorte central 256x256 (el de siempre)
 for m, c in zip(matches, CACHES):
     for v in ("squash", "wide"):
         z = np.load(Path(f"output/shot_benchmark/candidate_embeddings_{v}") / f"{Path(c).parent.name}.npz")

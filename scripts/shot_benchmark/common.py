@@ -1,6 +1,6 @@
 """Común a los experimentos de re-puntuación de candidatos a tiro (7 EFL).
-Candidatos = picos de la curva shot+goal con θ>=0.02 y NMS 4 s (los mismos que
-ve el verificador VLM). Etiqueta = emparejado 1 a 1 con GT de tiro a ±3 s.
+Candidatos = picos de la curva shot+goal con θ>=0.02 y NMS 4 s. Etiqueta =
+emparejado 1 a 1 con GT de tiro a ±3 s.
 Se concatena delante de cada experimento: cat common.py X.py | docker exec -i ... python -"""
 import glob
 from pathlib import Path
@@ -17,7 +17,7 @@ CACHES = sorted(glob.glob("datasets/SoccerNet/england_efl/2019-2020/*/720p.event
 EMB_DIR = Path("output/shot_benchmark/candidate_embeddings")
 
 
-def load_matches(with_vlm=False, with_emb=False):
+def load_matches(with_emb=False):
     matches = []
     for c in CACHES:
         meta, rows = read_event_windows(Path(c))
@@ -31,13 +31,6 @@ def load_matches(with_vlm=False, with_emb=False):
         pos = {pi for _, pi in match_1to1(gt, [Prediction(t, t, t, s) for t, s in peaks], TOL)}
         m = dict(name=Path(c).parent.name[13:40], L=np.log(P + EPS), curve=curve, idx=idx, peaks=peaks, gt=gt,
                  y=np.array([i in pos for i in range(len(peaks))], dtype=int))
-        if with_vlm:
-            from scripts.verify_shot_candidates import read_verdicts
-            vpath = Path(c.replace(".event_windows.", ".shot_verdicts.").replace(".jsonl", ".v1.jsonl"))
-            vt = {round(v["t_s"], 1): v["p_shot"] for v in read_verdicts(vpath)[1]}
-            missing = [t for t, _ in peaks if round(t, 1) not in vt]
-            assert not missing, f"{len(missing)} candidatos sin veredicto en {vpath.parent.name}"
-            m["p_vlm"] = np.array([vt[round(t, 1)] for t, _ in peaks])
         if with_emb:
             z = np.load(EMB_DIR / f"{Path(c).parent.name}.npz")
             assert np.array_equal(z["idx"], idx), f"candidatos distintos en {m['name']}"
@@ -57,10 +50,6 @@ def ctx_feats(m, K):
         out.append(np.concatenate([L[i], ctx[:K].mean(0), ctx[K + 1:].mean(0), ctx[K + 1:].max(0),
                                    [curve[i], curve[i] - c.min(), c.mean()]]))
     return np.array(out)
-
-
-def vlm_feats(m):
-    return np.column_stack([np.log(m["p_vlm"] + EPS), np.log(1 - m["p_vlm"] + EPS)])
 
 
 def LR(C=0.1):

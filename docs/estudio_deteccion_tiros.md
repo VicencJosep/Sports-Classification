@@ -6,6 +6,11 @@ fuera), es decir, manda la precisión. Todos los números de este documento se p
 con los scripts de `scripts/shot_benchmark/`; los ficheros de resultados están en
 `output/shot_benchmark/` (no versionado).
 
+> En `main` no está el código de los experimentos con VLM (servidores vLLM, `core/events_vllm.py`,
+> `scripts/verify_shot_candidates.py`, `vlm_bench.py` y sus lanzadores): las filas de Qwen3.5-9B,
+> VideoARM y Qwen3-Omni-30B, y los scripts de vLLM que se citan más abajo, solo se reproducen desde
+> la rama `feat/T-DEED`.
+
 ## 1. Conjuntos de evaluación
 
 | Nombre | Qué es | Para qué sirve | Limpio para… |

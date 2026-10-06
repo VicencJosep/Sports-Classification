@@ -14,9 +14,6 @@ Uso (desde la raíz del proyecto, dentro del contenedor):
     python -m scripts.scan_event_windows \\
         --video datasets/SoccerNet/england_efl/2019-2020/*/720p.mp4
 
-    # El VLM como escáner de tiros (experimento: ¿qué ve que V-JEPA2 no propone?)
-    python -m scripts.scan_event_windows --backend vlm-shot --video partido.mp4
-
     # Prueba rápida: solo las primeras N ventanas, a un fichero aparte
     python -m scripts.scan_event_windows --video partido.mp4 --max-windows 20 \\
         --output /tmp/prueba.jsonl
@@ -35,10 +32,10 @@ from analytics.engine import ensure_event_windows, iter_event_window_predictions
 
 logger = logging.getLogger(__name__)
 
-BACKENDS: tuple[str, ...] = ("vjepa2", "vlm-shot")
+BACKENDS: tuple[str, ...] = ("vjepa2",)
 
 
-def _make_classifier_factory(backend: str, device: str | None, base_url: str | None):
+def _make_classifier_factory(backend: str, device: str | None):
     """Devuelve una función que construye el clasificador la primera vez y
     reutiliza la misma instancia después (varios vídeos, un solo modelo)."""
     instance = None
@@ -56,13 +53,6 @@ def _make_classifier_factory(backend: str, device: str | None, base_url: str | N
                     device=device or ecfg.device,
                     num_frames=ecfg.num_frames,
                 )
-            elif backend == "vlm-shot":
-                from core.events_vllm import ShotVerifier, VLMShotWindowClassifier
-
-                vcfg = config.VideoARMEventsConfig()
-                instance = VLMShotWindowClassifier(ShotVerifier(
-                    base_url=base_url or vcfg.base_url, model_id=vcfg.model_id, api_key=vcfg.api_key,
-                ))
             else:
                 raise ValueError(f"Backend desconocido: {backend}")
         return instance
@@ -74,11 +64,6 @@ def _meta_extra(backend: str) -> dict:
     if backend == "vjepa2":
         ecfg = config.EventsConfig()
         return {"classifier_path": str(ecfg.classifier_path), "model_id": ecfg.model_id}
-    if backend == "vlm-shot":
-        from core.events_vllm import SHOT_VERIFIER_PROMPT_VERSION
-
-        return {"model_id": config.VideoARMEventsConfig().model_id,
-                "prompt_version": SHOT_VERIFIER_PROMPT_VERSION}
     return {}
 
 
@@ -93,8 +78,6 @@ def main() -> None:
     parser.add_argument("--min-window-fraction", type=float,
                         default=config.FullMatchConfig().min_window_fraction)
     parser.add_argument("--device", default=None)
-    parser.add_argument("--base-url", default=None,
-                        help="Solo vlm-shot: servidor vLLM (por defecto el de config.VideoARMEventsConfig)")
     parser.add_argument("--max-windows", type=int, default=None,
                         help="Solo para pruebas: escanea las primeras N ventanas y escribe a "
                              "--output (no toca la caché real)")
@@ -108,7 +91,7 @@ def main() -> None:
     if missing:
         parser.error(f"No existen: {', '.join(map(str, missing))}")
 
-    build = _make_classifier_factory(args.backend, args.device, args.base_url)
+    build = _make_classifier_factory(args.backend, args.device)
 
     if args.max_windows is not None:
         if args.output is None or len(args.video) != 1:

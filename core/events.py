@@ -154,14 +154,6 @@ def sample_frames_window(
     return _sample_range_at(video_path, start_s, end_s, np.linspace(start_s, end_s, num=n))
 
 
-def sample_frames_at(video_path: Path, times: Sequence[float]) -> list[np.ndarray]:
-    """Frames RGB en instantes arbitrarios (el decodificado más cercano a
-    cada uno), decodificando una sola vez el tramo ``[min, max]`` de
-    ``times``. Para muestreos no uniformes, p.ej. denso alrededor de un
-    instante y disperso en el contexto (``core.events_vllm.ShotVerifier``)."""
-    return _sample_range_at(video_path, float(min(times)), float(max(times)), times)
-
-
 def _sample_range_at(
     video_path: Path, start_s: float, end_s: float, target_times: Sequence[float]
 ) -> list[np.ndarray]:

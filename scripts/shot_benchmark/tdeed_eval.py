@@ -14,7 +14,7 @@ def tdeed_peaks(z, cls="SHOT", nms_s=4.0, min_score=0.01):
     k = 6; ps = np.convolve(p, np.ones(k) / k, mode="same")
     return find_peaks(t.tolist(), ps.tolist(), min_score, nms_s), (t, p)
 
-matches = load_matches(with_vlm=True)
+matches = load_matches()
 rows = []
 for m, c in zip(matches, CACHES):
     f = TD / f"{Path(c).parent.name}.npz"
