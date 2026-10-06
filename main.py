@@ -41,6 +41,7 @@ import config
 if TYPE_CHECKING:
     from core.ball_actions import BallActionClassifier
     from core.events import EventClassifier
+    from core.events_vllm import DirectVLMEventClassifier, HybridEventClassifier, VideoARMEventClassifier
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +57,46 @@ def _build_ball_action_classifier(
 
 
 def _build_event_classifier(
-    cfg: config.PipelineConfig, device: Optional[str], skip: bool
-) -> Optional["EventClassifier"]:
+    cfg: config.PipelineConfig, device: Optional[str], skip: bool, backend: str = "vjepa2"
+) -> Optional["EventClassifier | VideoARMEventClassifier | DirectVLMEventClassifier | HybridEventClassifier"]:
+    """Construye el clasificador de eventos del backend pedido.
+
+    Los cuatro backends son intercambiables porque exponen el mismo contrato
+    (``predict``/``predict_window`` -> ``EventPrediction``); ``analytics.engine``
+    los consume de forma duck-typed y no distingue cuál recibe.
+
+      vjepa2   V-JEPA2 + SVC in-process (core/events.py). Usa la GPU local y
+               ``--device``, y devuelve las 16 clases del SVC entrenado.
+      videoarm VideoARM + Qwen3.5-9B hablando con un servidor vLLM aparte
+               (core/events_vllm.py). NO usa la GPU de este proceso, así que
+               ``--device`` no aplica; requiere el servidor arrancado
+               (``scripts/serve_events_vllm.sh``) y devuelve 9 eventos +
+               "background".
+      direct   Mismo Qwen3.5-9B/vLLM, SIN VideoARM (un mensaje, N frames, sin
+               tool-calling). Ver ``DirectVLMEventClassifier``.
+      hybrid   direct primero; si predice "goal" se confía, si no se
+               reconsulta con videoarm. El MEJOR medido con diferencia sobre
+               goal/shot (66% vs 44-51% de los otros tres, ver README § "¿Aporta
+               valor VideoARM?") -- backend recomendado si se usa este módulo.
+    """
     if skip:
         return None
+
+    if backend in ("videoarm", "direct", "hybrid"):
+        from core.events_vllm import DirectVLMEventClassifier, HybridEventClassifier, VideoARMEventClassifier
+
+        vcfg = cfg.videoarm_events
+        common = dict(base_url=vcfg.base_url, model_id=vcfg.model_id, api_key=vcfg.api_key)
+        if backend == "videoarm":
+            return VideoARMEventClassifier(
+                max_iterations=vcfg.max_iterations, total_frames_limit=vcfg.total_frames_limit, **common
+            )
+        if backend == "direct":
+            return DirectVLMEventClassifier(**common)
+        return HybridEventClassifier(
+            max_iterations=vcfg.max_iterations, total_frames_limit=vcfg.total_frames_limit, **common
+        )
+
     from core.events import EventClassifier
 
     return EventClassifier(
@@ -193,7 +230,9 @@ def _run_clip(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
     _run_homography(args.source, tracks_path, output_dir, cfg, args)
 
     ball_action_classifier = _build_ball_action_classifier(cfg, args.device, args.skip_ball_actions)
-    event_classifier = _build_event_classifier(cfg, args.device, args.skip_events)
+    event_classifier = _build_event_classifier(
+        cfg, args.device, args.skip_events, backend=args.events_backend
+    )
 
     telemetry, possession_records = analyze_match(
         source_video=args.source,
@@ -226,7 +265,7 @@ def _run_clip(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
             team_by_tracker_id=team_by_tracker_id,
             possessor_by_frame=possessor_by_frame,
             telemetry=telemetry,
-            trace_length=cfg.analytics.trace_length,
+            trace_length=cfg.analytics.trace_length if args.trace_length is None else args.trace_length,
             action_highlight_frames=cfg.analytics.action_highlight_frames,
         )
         logger.info("Vídeo final escrito en %s", final_path)
@@ -281,6 +320,37 @@ def _run_publish(
         )
 
 
+def _build_spot_kwargs(args: argparse.Namespace, cfg: config.PipelineConfig) -> dict:
+    """Argumentos de T-DEED para ``analyze_full_match`` (vacío si no se usa).
+    Calcula la caché de probabilidades del vídeo si no existe y libera el
+    modelo antes de volver: el resto del pipeline necesita esa VRAM."""
+    use_for_events = args.shot_backend == "tdeed" and not args.skip_events
+    use_for_actions = args.ball_actions_trigger == "tdeed" and not args.skip_ball_actions
+    if not (use_for_events or use_for_actions):
+        return {}
+
+    from core.ball_spotting import TDEEDSpotter, read_scores, scores_cache_path
+
+    spot_cfg = cfg.ball_spotting
+    cache_path = scores_cache_path(args.source, spot_cfg.model_name)
+    if not cache_path.exists():
+        spotter = TDEEDSpotter(spot_cfg.model_name, spot_cfg.repo_dir, spot_cfg.checkpoints_dir)
+        spotter.ensure_scores(args.source, cache_path)
+        spotter.release()
+
+    kwargs: dict = {"spot_scores": read_scores(cache_path)}
+    if use_for_events:
+        kwargs["event_spot_params"] = {
+            "SHOT": (spot_cfg.shot_min_score, spot_cfg.event_nms_s),
+            "GOAL": (spot_cfg.goal_min_score, spot_cfg.event_nms_s),
+        }
+        kwargs["event_spot_smooth_frames"] = spot_cfg.event_smooth_frames
+    if use_for_actions:
+        kwargs["ball_action_spot_params"] = (spot_cfg.action_min_score, spot_cfg.action_nms_s)
+        kwargs["ball_action_label_source"] = args.ball_actions_label
+    return kwargs
+
+
 def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
     from analytics.engine import analyze_full_match, render_match_video
 
@@ -288,7 +358,11 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
     output_dir.mkdir(parents=True, exist_ok=True)
 
     ball_action_classifier = _build_ball_action_classifier(cfg, args.device, args.skip_ball_actions)
-    event_classifier = _build_event_classifier(cfg, args.device, args.skip_events)
+    event_classifier = _build_event_classifier(
+        cfg, args.device, args.skip_events, backend=args.events_backend
+    )
+
+    spot_kwargs = _build_spot_kwargs(args, cfg)
 
     telemetry, tracks_path, possessor_by_frame = analyze_full_match(
         source_video=args.source,
@@ -302,6 +376,7 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
         min_window_fraction=cfg.full_match.min_window_fraction,
         ball_action_temporal_offsets_frames=cfg.ball_actions.temporal_offsets_frames,
         device=args.device,
+        **spot_kwargs,
     )
     logger.info(
         "Partido analizado: %d frames, %d cambios de posesión, %d tramos de evento",
@@ -330,7 +405,7 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
             team_by_tracker_id=team_by_tracker_id,
             possessor_by_frame=possessor_by_frame,
             telemetry=telemetry,
-            trace_length=cfg.analytics.trace_length,
+            trace_length=cfg.analytics.trace_length if args.trace_length is None else args.trace_length,
             event_spans=telemetry.events,
             action_highlight_frames=cfg.analytics.action_highlight_frames,
         )
@@ -349,6 +424,26 @@ def main() -> None:
     parser.add_argument("--skip-classification", action="store_true", help="No asignar equipos (team_by_tracker_id=None)")
     parser.add_argument("--skip-ball-actions", action="store_true")
     parser.add_argument("--skip-events", action="store_true")
+    parser.add_argument("--shot-backend", choices=["tdeed", "events"], default="tdeed",
+                        help="Solo --mode full-match. Quién detecta shot/goal: 'tdeed' "
+                             "(core/ball_spotting.py, por defecto: AP de tiros 75-78%% frente al "
+                             "~34%% de V-JEPA2; el resto de eventos sigue saliendo de "
+                             "--events-backend) o 'events' (todo de --events-backend, como antes)")
+    parser.add_argument("--ball-actions-trigger", choices=["tdeed", "possession"], default="tdeed",
+                        help="Solo --mode full-match. Cuándo hay una acción de balón: en cada "
+                             "acción detectada por T-DEED (por defecto; F1 88%% frente al 38%% del "
+                             "cambio de posesión en ground_truth/) o en cada cambio de posesión, "
+                             "como antes; el jugador sale siempre de la posesión")
+    parser.add_argument("--ball-actions-label", choices=["classifier", "spotter", "combined"],
+                        default="combined",
+                        help="Con --ball-actions-trigger tdeed, quién pone la etiqueta: el R3D-18 "
+                             "('classifier'), T-DEED ('spotter') o los dos ('combined')")
+    parser.add_argument("--events-backend", choices=["vjepa2", "videoarm", "direct", "hybrid"], default="vjepa2",
+                        help="Clasificador de eventos: 'vjepa2' (core/events.py, in-process, "
+                             "por defecto) o los tres de core/events_vllm.py -- requieren el "
+                             "servidor vLLM arrancado (scripts/serve_events_vllm.sh): 'videoarm' "
+                             "(orquestador), 'direct' (mismo modelo sin VideoARM), 'hybrid' "
+                             "(el mejor medido sobre goal/shot, ver README)")
     parser.add_argument("--skip-homography", action="store_true",
                         help="No calibrar el campo (sin tracks_2d.jsonl ni radar.mp4)")
     parser.add_argument("--homography-stride", type=int, default=None,
@@ -357,6 +452,9 @@ def main() -> None:
     parser.add_argument("--radar", action="store_true",
                         help="Escribe radar.mp4 (vista cenital) además de tracks_2d.jsonl")
     parser.add_argument("--skip-render", action="store_true", help="No escribir final.mp4, solo telemetry.json")
+    parser.add_argument("--trace-length", type=int, default=None,
+                        help="Frames de estela por jugador en el vídeo final (0 = solo el círculo, sin estela); "
+                             "por defecto config.AnalyticsConfig.trace_length")
     parser.add_argument("--publish", action="store_true",
                         help="Solo --mode clip: sube final.mp4 a YouTube Studio con "
                              "automation/molmo_publisher.py (requiere sesión de Google ya "

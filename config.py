@@ -69,6 +69,34 @@ class EventsConfig:
 
 
 @dataclass(frozen=True)
+class VideoARMEventsConfig:
+    """Hiperparámetros de core/events_vllm.py (VideoARM + Qwen3.5-9B servido
+    con vLLM) -- backend alternativo a EventsConfig (V-JEPA2 + SVC).
+
+    A diferencia de EventsConfig, el modelo NO vive en este proceso: corre en
+    un SERVIDOR APARTE, la imagen oficial `vllm/vllm-openai` lanzada por
+    `scripts/serve_events_vllm.sh` (ver README § "Servir Qwen3.5-9B con
+    vLLM"). El aislamiento es el mismo motivo que el intérprete aparte de
+    MolmoWeb-4B (ver PublisherConfig.venv_python): vLLM resuelve su propio
+    torch/CUDA y no convive con los pines de requirements.txt. Este proceso
+    solo le habla por HTTP OpenAI-compatible; classifier_path/model_id/
+    num_frames de EventsConfig no aplican aquí -- base_url sí es el
+    equivalente de "dónde está el modelo".
+    """
+
+    base_url: str = "http://localhost:8010/v1"   # puerto de scripts/serve_events_vllm.sh
+    model_id: str = "Qwen/Qwen3.5-9B"       # debe coincidir con --served-model-name del servidor
+    api_key: str = "EMPTY"                  # vLLM no valida la key; VideoARM exige que exista
+    max_iterations: int = 2                 # ver core.events_vllm.DEFAULT_MAX_ITERATIONS -- el
+                                             # parche _Qwen35CompatAgent fuerza tool_choice=
+                                             # "required" en todas las iteraciones, así que 2 ya es
+                                             # seguro y deja entrar a clip_analyzer
+    total_frames_limit: int = 32            # VideoARM los manda en mosaicos de 2x3 -> ~6 imágenes
+                                             # por prompt; subirlo exige subir --limit-mm-per-prompt
+                                             # en scripts/serve_events_vllm.sh
+
+
+@dataclass(frozen=True)
 class BallActionsConfig:
     """Hiperparámetros de core/ball_actions.py (clasificador R3D-18 fine-tuned).
 
@@ -95,6 +123,30 @@ class BallActionsConfig:
     # así que promediar (-8, 0, 8) solo añade ventanas que ya no contienen la
     # acción: F1 global 29.0% -> 29.2% a 3x de coste de inferencia. No
     # reintentar sin arreglar antes el disparador (ver README/analytics.engine).
+
+
+@dataclass(frozen=True)
+class BallSpottingConfig:
+    """Hiperparámetros de core/ball_spotting.py (T-DEED, detección puntual de
+    acciones de balón). Sustituye a core/events.py para shot/goal y, opcional,
+    al disparador por cambio de posesión de las acciones de balón.
+
+    Umbrales medidos (ver el docstring de core/ball_spotting.py):
+    ``shot_min_score=0.3`` -> P 65% / R 84% en 6 partidos SoccerNet-v2 de otras
+    ligas (0.5 -> P 75% / R 73%). ``action_min_score=0.5`` -> F1 90% en
+    ground_truth/ (0.3 -> 84%); elegido sobre ese mismo partido, así que es
+    algo optimista.
+    """
+
+    repo_dir: Path = PROJECT_ROOT / "models" / "tdeed" / "T-DEED"
+    checkpoints_dir: Path = PROJECT_ROOT / "models" / "tdeed"
+    model_name: str = "SoccerNetBall_challenge2"
+    shot_min_score: float = 0.3
+    goal_min_score: float = 0.3
+    event_nms_s: float = 4.0                # dos tiros a menos de 4 s son el mismo pico
+    event_smooth_frames: int = 6            # ~0,5 s (frames muestreados a 12,5 fps)
+    action_min_score: float = 0.5
+    action_nms_s: float = 0.5               # ~12 frames: acciones seguidas del mismo tipo
 
 
 @dataclass(frozen=True)
@@ -249,7 +301,9 @@ class PipelineConfig:
 
     tracking: TrackingConfig = field(default_factory=TrackingConfig)
     events: EventsConfig = field(default_factory=EventsConfig)
+    videoarm_events: VideoARMEventsConfig = field(default_factory=VideoARMEventsConfig)
     ball_actions: BallActionsConfig = field(default_factory=BallActionsConfig)
+    ball_spotting: BallSpottingConfig = field(default_factory=BallSpottingConfig)
     classification: ClassificationConfig = field(default_factory=ClassificationConfig)
     homography: HomographyConfig = field(default_factory=HomographyConfig)
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)

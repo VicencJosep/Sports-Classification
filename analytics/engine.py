@@ -51,7 +51,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Iterator, Mapping, Optional
 
 import cv2
 import numpy as np
@@ -60,6 +60,7 @@ from core.windowing import Window, iter_windows
 
 if TYPE_CHECKING:
     from core.ball_actions import BallActionClassifier
+    from core.ball_spotting import SpotScores
     from core.events import EventClassifier, EventPrediction
 
 logger = logging.getLogger(__name__)
@@ -91,6 +92,112 @@ class PossessionChangeAction:
     confidence: float
     probabilities: dict[str, float]
     is_background: bool
+    spot_score: Optional[float] = None   # score del pico de T-DEED que disparó la
+                                         # acción (None si el disparo fue un cambio
+                                         # de posesión)
+
+
+@dataclass(frozen=True)
+class SpottedAction:
+    """Acción de balón detectada por ``core.ball_spotting`` (T-DEED): el
+    instante y la clase, sin jugador. ``_analyze_possession_and_ball_actions``
+    le pone el jugador (el poseedor en ese frame)."""
+
+    frame_idx: int
+    label: str                           # vocabulario de core/ball_actions.py
+    score: float
+    probabilities: dict[str, float]      # T-DEED, sobre las clases de acción
+
+
+# Radio (frames) dentro del que dos picos de clases distintas se consideran la
+# MISMA acción (p.ej. PASS y HIGH PASS sobre el mismo golpeo): se queda el de
+# más score. ~0,5 s a 25 fps, igual que la tolerancia entre acciones seguidas
+# de las anotaciones de SoccerNet Ball.
+SPOT_CROSS_CLASS_NMS_FRAMES: int = 12
+
+# Margen con el que un evento puntual de T-DEED se convierte en ``EventSpan``
+# (el resto del pipeline -- telemetría, render -- trabaja con tramos).
+SPOT_EVENT_HALF_SPAN_S: float = 1.0
+
+
+def spotted_ball_actions(
+    scores: "SpotScores",
+    min_score: float,
+    nms_s: float,
+) -> list[SpottedAction]:
+    """Acciones de balón (pass/drive/high_pass/header/throw_in) a partir de la
+    caché de T-DEED: picos por clase y, entre clases, el de más score cuando
+    caen sobre el mismo golpeo."""
+    from core.ball_spotting import BALL_ACTION_LABELS, spot
+
+    row_of = {int(f): i for i, f in enumerate(scores.frame_indices())}
+    columns = {raw: scores.classes.index(raw) for raw in BALL_ACTION_LABELS}
+    candidates = [
+        (score, frame, BALL_ACTION_LABELS[raw])
+        for raw in BALL_ACTION_LABELS
+        for frame, score in spot(scores, raw, min_score, nms_s)
+    ]
+    candidates.sort(reverse=True)
+
+    kept: list[SpottedAction] = []
+    for score, frame, label in candidates:
+        if any(abs(frame - k.frame_idx) <= SPOT_CROSS_CLASS_NMS_FRAMES for k in kept):
+            continue
+        row = scores.probs[row_of[frame]]
+        kept.append(SpottedAction(
+            frame_idx=frame, label=label, score=score,
+            probabilities={BALL_ACTION_LABELS[raw]: float(row[col]) for raw, col in columns.items()},
+        ))
+    kept.sort(key=lambda a: a.frame_idx)
+    return kept
+
+
+def spotted_event_spans(
+    scores: "SpotScores",
+    params: Mapping[str, tuple[float, float]],
+    smooth_frames: int,
+) -> list["EventSpan"]:
+    """Eventos de T-DEED (shot/goal) como ``EventSpan`` de ±1 s en torno al
+    pico. ``params``: ``{etiqueta T-DEED: (min_score, nms_s)}``."""
+    from core.ball_spotting import EVENT_LABELS, spot_events
+
+    return [
+        EventSpan(
+            label=e.label,
+            start_s=max(0.0, e.t_s - SPOT_EVENT_HALF_SPAN_S),
+            end_s=e.t_s + SPOT_EVENT_HALF_SPAN_S,
+            peak_confidence=e.score, mean_confidence=e.score, n_windows=1,
+        )
+        for e in spot_events(scores, params, EVENT_LABELS, smooth_frames)
+    ]
+
+
+def _combine_action_label(
+    spotted: SpottedAction, classifier_probabilities: dict[str, float], label_source: str
+) -> tuple[str, float, dict[str, float]]:
+    """Etiqueta final de una acción disparada por T-DEED.
+
+    * ``"spotter"``: la de T-DEED.
+    * ``"classifier"``: la del R3D-18 (que puede decir ``background``).
+    * ``"combined"``: T-DEED ya decidió que HAY una acción, así que se descarta
+      ``background`` y se multiplican las dos distribuciones sobre las clases
+      de acción (media geométrica, renormalizada).
+    """
+    if label_source == "spotter":
+        return spotted.label, spotted.score, dict(spotted.probabilities)
+    if label_source == "classifier":
+        label = max(classifier_probabilities, key=classifier_probabilities.get)
+        return label, float(classifier_probabilities[label]), classifier_probabilities
+
+    eps = 1e-6
+    combined = {
+        cls: ((p + eps) * (classifier_probabilities.get(cls, 0.0) + eps)) ** 0.5
+        for cls, p in spotted.probabilities.items()
+    }
+    total = sum(combined.values())
+    combined = {cls: v / total for cls, v in combined.items()}
+    label = max(combined, key=combined.get)
+    return label, float(combined[label]), combined
 
 
 @dataclass
@@ -377,10 +484,19 @@ def _analyze_possession_and_ball_actions(
     max_possessor_distance_px: float,
     hysteresis_frames: int,
     temporal_offsets_frames: tuple[int, ...],
+    spotted_actions: Optional[list[SpottedAction]] = None,
+    label_source: str = "classifier",
 ) -> tuple[list[PossessionChangeAction], dict[int, Optional[int]], int]:
     """Pase B del flujo de partido completo: posesión (generador de
     ``core.possession``, O(1) de estado) + acción de balón por cambio de
     posesión — sin decodificar el vídeo entero (``_read_all_frames``).
+
+    Con ``spotted_actions`` (T-DEED, ver ``spotted_ball_actions``) el disparo
+    deja de ser el cambio de posesión -- medido contra ``ground_truth/``: solo
+    el 34% de esos disparos cae sobre una acción real -- y pasa a ser cada
+    acción detectada; el jugador es el poseedor en ese frame (o el último
+    conocido) y la etiqueta la decide ``label_source`` (ver
+    ``_combine_action_label``).
 
     Si hay ``ball_action_classifier``, mantiene un buffer de frames ACOTADO
     (podado a medida que avanza el pase) alimentado en el mismo recorrido
@@ -414,11 +530,32 @@ def _analyze_possession_and_ball_actions(
     n_frames = 0
     last_possessor: Optional[int] = None
 
-    if ball_action_classifier is None:
-        # Sin acciones de balón que clasificar, no hace falta decodificar vídeo.
+    spotted_by_frame = {a.frame_idx: a for a in spotted_actions} if spotted_actions is not None else None
+
+    def _spotter_only_action(spotted: SpottedAction, tracker_id: Optional[int]) -> PossessionChangeAction:
+        return PossessionChangeAction(
+            frame_idx=spotted.frame_idx,
+            tracker_id=tracker_id if tracker_id is not None else -1,
+            label=spotted.label,
+            confidence=spotted.score,
+            probabilities=dict(spotted.probabilities),
+            is_background=False,
+            spot_score=spotted.score,
+        )
+
+    if ball_action_classifier is None or (spotted_by_frame is not None and label_source == "spotter"):
+        # Sin ventanas que clasificar, no hace falta decodificar vídeo.
         for record in _iter_possession_jsonl():
-            possessor_by_frame[record["frame_idx"]] = record.get("possessor_tracker_id")
+            frame_idx = record["frame_idx"]
+            possessor = record.get("possessor_tracker_id")
+            possessor_by_frame[frame_idx] = possessor
             n_frames += 1
+            if spotted_by_frame is not None and frame_idx in spotted_by_frame:
+                ball_actions.append(_spotter_only_action(
+                    spotted_by_frame[frame_idx], possessor if possessor is not None else last_possessor
+                ))
+            if possessor is not None:
+                last_possessor = possessor
         return ball_actions, possessor_by_frame, n_frames
 
     num_frames = ball_action_classifier.num_frames
@@ -431,11 +568,11 @@ def _analyze_possession_and_ball_actions(
     # sin podarlo serían ~135k records con ~10 tracks cada uno en un partido de
     # 90 min, creciendo linealmente hasta el final del pase.
     records_buffer: dict[int, dict] = {}
-    pending: list[tuple[int, int, tuple[float, float, float, float]]] = []
+    pending: list[tuple[int, int, tuple[float, float, float, float], Optional[SpottedAction]]] = []
 
     def _flush_ready(up_to_idx: float) -> None:
         while pending and pending[0][0] + max_offset + half <= up_to_idx:
-            trig_idx, tracker_id, bbox = pending.pop(0)
+            trig_idx, tracker_id, bbox, spotted = pending.pop(0)
             try:
                 pred = _predict_ball_action_temporally(
                     ball_action_classifier=ball_action_classifier,
@@ -451,14 +588,20 @@ def _analyze_possession_and_ball_actions(
                     "Error clasificando ventana de acción en frame %d", trig_idx
                 )
                 continue
+            label, confidence, probabilities = pred.label, pred.confidence, pred.probabilities
+            if spotted is not None:
+                label, confidence, probabilities = _combine_action_label(
+                    spotted, pred.probabilities, label_source
+                )
             ball_actions.append(
                 PossessionChangeAction(
                     frame_idx=trig_idx,
                     tracker_id=tracker_id,
-                    label=pred.label,
-                    confidence=pred.confidence,
-                    probabilities=pred.probabilities,
-                    is_background=pred.is_background,
+                    label=label,
+                    confidence=confidence,
+                    probabilities=probabilities,
+                    is_background=(label == "background"),
+                    spot_score=spotted.score if spotted is not None else None,
                 )
             )
 
@@ -479,10 +622,22 @@ def _analyze_possession_and_ball_actions(
             frame_buffer[frame_idx] = frame
             records_buffer[frame_idx] = record
 
-            if possessor is not None and possessor != last_possessor:
+            if spotted_by_frame is not None:
+                spotted = spotted_by_frame.get(frame_idx)
+                if spotted is not None:
+                    tracker_id = possessor if possessor is not None else last_possessor
+                    bbox = _bbox_for_tracker(record, tracker_id) if tracker_id is not None else None
+                    if bbox is not None:
+                        pending.append((frame_idx, tracker_id, bbox, spotted))
+                    else:
+                        # Sin jugador que recortar no hay ventana para el
+                        # clasificador: la acción se conserva con la etiqueta
+                        # de T-DEED.
+                        ball_actions.append(_spotter_only_action(spotted, tracker_id))
+            elif possessor is not None and possessor != last_possessor:
                 bbox = _bbox_for_tracker(record, possessor)
                 if bbox is not None:
-                    pending.append((frame_idx, possessor, bbox))
+                    pending.append((frame_idx, possessor, bbox, None))
                 else:
                     logger.warning(
                         "Sin bbox para tracker_id=%s en frame %d, salto la ventana",
@@ -506,6 +661,7 @@ def _analyze_possession_and_ball_actions(
         cap.release()
 
     _flush_ready(float("inf"))
+    ball_actions.sort(key=lambda a: a.frame_idx)
     return ball_actions, possessor_by_frame, n_frames
 
 
@@ -579,6 +735,194 @@ def _merge_event_windows(
     return spans
 
 
+def iter_event_window_predictions(
+    source_video: Path | str,
+    event_classifier,
+    window_s: float = 6.0,
+    stride_s: float = 3.0,
+    min_window_fraction: float = 0.5,
+    skip_windows: int = 0,
+) -> Iterator[tuple[Window, "EventPrediction"]]:
+    """Pase C de ``analyze_full_match``: clasifica cada ventana deslizante de
+    ``source_video`` con ``event_classifier.predict_window`` (cualquier
+    backend, duck-typed) y va emitiendo ``(Window, EventPrediction)``.
+
+    Vive aparte de ``analyze_full_match`` para que ``scripts/
+    scan_event_windows.py`` produzca exactamente las mismas ventanas que el
+    pipeline al cachear las probabilidades crudas (ver ``core/spotting.py``).
+    ``skip_windows`` salta las primeras N ventanas (reanudar un escaneo
+    cortado) sin decodificarlas. Las ventanas que fallan se registran y se
+    omiten, igual que antes de extraer esta función.
+    """
+    import supervision as sv
+
+    source_video = Path(source_video)
+    video_info = sv.VideoInfo.from_video_path(str(source_video))
+    fps = float(video_info.fps or 25)
+    for window in iter_windows(video_info.total_frames, fps, window_s, stride_s):
+        if window.index < skip_windows:
+            continue
+        if window.duration_s < window_s * min_window_fraction:
+            continue
+        try:
+            pred = event_classifier.predict_window(source_video, window.start_s, window.end_s)
+        except Exception as exc:
+            # Un OOM de CUDA no es un problema de ESA ventana: la GPU es
+            # compartida y, si otro proceso crece, fallarían todas las
+            # siguientes y el escaneo acabaría "completo" pero lleno de huecos.
+            # Se propaga para que ensure_event_windows se corte y un reintento
+            # reanude desde la última ventana escrita.
+            if type(exc).__name__ == "OutOfMemoryError":
+                raise
+            logger.exception(
+                "Error clasificando ventana de evento [%.2f, %.2f]s",
+                window.start_s, window.end_s,
+            )
+            continue
+        yield window, pred
+
+
+EVENT_WINDOWS_SCHEMA_VERSION: int = 1
+
+
+def event_windows_cache_path(
+    source_video: Path | str, backend: str, window_s: float, stride_s: float
+) -> Path:
+    """Ruta de la caché de ventanas junto al vídeo, p.ej. ``720p.mp4`` ->
+    ``720p.event_windows.vjepa2.w6s3.jsonl``. Backend y geometría de ventana
+    van en el nombre para que dos escaneos distintos no se pisen."""
+    source_video = Path(source_video)
+    tag = f"{backend}.w{window_s:g}s{stride_s:g}"
+    return source_video.with_name(f"{source_video.stem}.event_windows.{tag}.jsonl")
+
+
+def read_event_windows(cache_path: Path | str) -> tuple[dict, list[dict]]:
+    """Lee una caché de ``ensure_event_windows``: ``(meta, filas)``. Cada fila
+    es ``{index, start_s, end_s, label, confidence, is_background,
+    probabilities}``."""
+    with open(cache_path) as f:
+        meta = json.loads(f.readline())["meta"]
+        rows = [json.loads(line) for line in f if line.strip()]
+    return meta, rows
+
+
+def ensure_event_windows(
+    source_video: Path | str,
+    build_classifier,
+    backend: str,
+    window_s: float = 6.0,
+    stride_s: float = 3.0,
+    min_window_fraction: float = 0.5,
+    cache_path: Optional[Path] = None,
+    meta_extra: Optional[dict] = None,
+) -> Path:
+    """Escanea ``source_video`` con ventanas deslizantes y guarda la
+    predicción CRUDA de cada ventana (las probabilidades de todas las clases,
+    no solo la etiqueta ganadora) en un JSONL junto al vídeo. Si la caché ya
+    existe, no hace nada.
+
+    Es la parte cara del flujo de partido completo (~26 min con V-JEPA2 para
+    96 min de partido); todo lo que va detrás -- fusión de tramos, detección
+    de picos (``core/spotting.py``), evaluación -- se recalcula en segundos
+    desde aquí sin volver a tocar la GPU.
+
+    ``build_classifier`` es una función sin argumentos que devuelve el
+    clasificador: solo se llama si hay que escanear, así una caché completa
+    no obliga a cargar el modelo.
+
+    Mismo esquema anti-caché-corrupta que ``core.tracking.ensure_tracking``
+    (se escribe a ``.tmp`` y solo se renombra al terminar), con una
+    diferencia: si queda un ``.tmp`` de un escaneo cortado con los mismos
+    parámetros, se REANUDA desde la última ventana escrita en vez de empezar
+    de cero -- la GPU es compartida con otros procesos del host y un OOM a
+    mitad de partido no debería costar el escaneo entero.
+    """
+    import time
+
+    import supervision as sv
+
+    source_video = Path(source_video)
+    cache_path = Path(cache_path) if cache_path else event_windows_cache_path(
+        source_video, backend, window_s, stride_s
+    )
+    if cache_path.exists():
+        logger.info("Caché de ventanas ya existe, reutilizando: %s", cache_path)
+        return cache_path
+
+    video_info = sv.VideoInfo.from_video_path(str(source_video))
+    fps = float(video_info.fps or 25)
+    meta = {
+        "schema_version": EVENT_WINDOWS_SCHEMA_VERSION,
+        "source_video": str(source_video),
+        "backend": backend,
+        "window_s": window_s,
+        "stride_s": stride_s,
+        "min_window_fraction": min_window_fraction,
+        "fps": fps,
+        "total_frames": video_info.total_frames,
+        **(meta_extra or {}),
+    }
+    stride_frames = max(1, round(stride_s * fps))
+    n_windows_total = -(-video_info.total_frames // stride_frames)
+
+    tmp_path = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    resume_from = 0
+    if tmp_path.exists():
+        try:
+            old_meta, old_rows = read_event_windows(tmp_path)
+        except (json.JSONDecodeError, KeyError):
+            old_meta, old_rows = None, []
+        same_params = old_meta is not None and all(
+            old_meta.get(k) == meta[k] for k in ("backend", "window_s", "stride_s", "total_frames")
+        )
+        if same_params:
+            resume_from = old_rows[-1]["index"] + 1 if old_rows else 0
+            # Reescribe el .tmp sin una posible última línea a medias.
+            with open(tmp_path, "w") as f:
+                f.write(json.dumps({"meta": old_meta}) + "\n")
+                for row in old_rows:
+                    f.write(json.dumps(row) + "\n")
+            logger.info("Reanudando escaneo de %s desde la ventana %d", source_video.name, resume_from)
+        else:
+            tmp_path.unlink()
+
+    if resume_from == 0 and not tmp_path.exists():
+        with open(tmp_path, "w") as f:
+            f.write(json.dumps({"meta": meta}) + "\n")
+
+    classifier = build_classifier()
+    started = time.perf_counter()
+    n_done = 0
+    with open(tmp_path, "a") as f:
+        for window, pred in iter_event_window_predictions(
+            source_video, classifier, window_s=window_s, stride_s=stride_s,
+            min_window_fraction=min_window_fraction, skip_windows=resume_from,
+        ):
+            f.write(json.dumps({
+                "index": window.index,
+                "start_s": window.start_s,
+                "end_s": window.end_s,
+                "label": pred.label,
+                "confidence": pred.confidence,
+                "is_background": pred.is_background,
+                "probabilities": pred.probabilities,
+            }) + "\n")
+            n_done += 1
+            if n_done % 100 == 0:
+                f.flush()
+                elapsed = time.perf_counter() - started
+                remaining = n_windows_total - window.index - 1
+                logger.info(
+                    "%s: ventana %d/%d (%.2fs/ventana, ~%.0f min restantes)",
+                    source_video.name, window.index + 1, n_windows_total,
+                    elapsed / n_done, remaining * elapsed / n_done / 60,
+                )
+
+    tmp_path.rename(cache_path)
+    logger.info("Caché de ventanas escrita: %s", cache_path)
+    return cache_path
+
+
 def analyze_full_match(
     source_video: Path | str,
     detector_name: str = "hybrid",
@@ -591,6 +935,11 @@ def analyze_full_match(
     min_window_fraction: float = 0.5,
     ball_action_temporal_offsets_frames: tuple[int, ...] = (0,),
     device: Optional[str] = None,
+    spot_scores: Optional["SpotScores"] = None,
+    event_spot_params: Optional[Mapping[str, tuple[float, float]]] = None,
+    event_spot_smooth_frames: int = 1,
+    ball_action_spot_params: Optional[tuple[float, float]] = None,
+    ball_action_label_source: str = "classifier",
 ) -> tuple[FullMatchTelemetry, Path, dict[int, Optional[int]]]:
     """Analiza un partido completo (~90 min): Pase A (tracking, cacheado) +
     Pase B (posesión + acciones de balón, streaming) + Pase C (eventos por
@@ -603,10 +952,24 @@ def analyze_full_match(
     ``tracks_jsonl_path`` y ``possessor_by_frame`` se reutilizan para el
     render, con el mismo propósito con el que ``analyze_match`` devuelve
     ``possession_records``.
+
+    Con ``spot_scores`` (caché de T-DEED, ``core/ball_spotting.py``):
+
+    * ``event_spot_params`` (``{etiqueta T-DEED: (min_score, nms_s)}``): los
+      eventos de esas clases (shot/goal) salen de T-DEED y los tramos de
+      ``event_classifier`` con esas mismas etiquetas se descartan.
+    * ``ball_action_spot_params`` (``(min_score, nms_s)``): las acciones de
+      balón se disparan en los picos de T-DEED en vez de en los cambios de
+      posesión (ver ``_analyze_possession_and_ball_actions``).
     """
     from core.tracking import ensure_tracking
 
     source_video = Path(source_video)
+    spotted_actions = (
+        spotted_ball_actions(spot_scores, *ball_action_spot_params)
+        if spot_scores is not None and ball_action_spot_params is not None
+        else None
+    )
 
     # Pase A: tracking (cacheado junto al vídeo — ver core.tracking.ensure_tracking)
     tracks_path = ensure_tracking(source_video, detector_name=detector_name, device=device)
@@ -619,29 +982,30 @@ def analyze_full_match(
         max_possessor_distance_px=max_possessor_distance_px,
         hysteresis_frames=hysteresis_frames,
         temporal_offsets_frames=ball_action_temporal_offsets_frames,
+        spotted_actions=spotted_actions,
+        label_source=ball_action_label_source,
     )
 
     # Pase C: eventos por ventana deslizante de duración fija -> tramos fusionados
     events: list[EventSpan] = []
     if event_classifier is not None:
-        import supervision as sv
-
-        video_info = sv.VideoInfo.from_video_path(str(source_video))
-        fps = float(video_info.fps or 25)
-        window_predictions: list[tuple[Window, "EventPrediction"]] = []
-        for window in iter_windows(video_info.total_frames, fps, event_window_s, event_stride_s):
-            if window.duration_s < event_window_s * min_window_fraction:
-                continue
-            try:
-                pred = event_classifier.predict_window(source_video, window.start_s, window.end_s)
-            except Exception:
-                logger.exception(
-                    "Error clasificando ventana de evento [%.2f, %.2f]s",
-                    window.start_s, window.end_s,
-                )
-                continue
-            window_predictions.append((window, pred))
+        window_predictions = list(
+            iter_event_window_predictions(
+                source_video, event_classifier,
+                window_s=event_window_s, stride_s=event_stride_s,
+                min_window_fraction=min_window_fraction,
+            )
+        )
         events = _merge_event_windows(window_predictions)
+
+    if spot_scores is not None and event_spot_params:
+        from core.ball_spotting import EVENT_LABELS
+
+        spans = spotted_event_spans(spot_scores, event_spot_params, event_spot_smooth_frames)
+        replaced = {EVENT_LABELS[raw] for raw in event_spot_params if raw in EVENT_LABELS}
+        events = sorted(
+            [e for e in events if e.label not in replaced] + spans, key=lambda e: e.start_s
+        )
 
     telemetry = FullMatchTelemetry(
         source_video=str(source_video),
@@ -900,6 +1264,10 @@ def main() -> None:
     parser.add_argument("--telemetry", default=None, type=Path, help="Si se indica, escribe también telemetry.json")
     parser.add_argument("--skip-ball-actions", action="store_true", help="No cargar/correr core.ball_actions")
     parser.add_argument("--skip-events", action="store_true", help="No cargar/correr core.events")
+    parser.add_argument("--events-backend", choices=["vjepa2", "videoarm", "direct", "hybrid"], default="vjepa2",
+                        help="Clasificador de eventos: 'vjepa2' (core.events, in-process, por "
+                             "defecto) o los de core.events_vllm (requieren el servidor vLLM "
+                             "arrancado): 'videoarm', 'direct', 'hybrid' (el mejor medido, ver README)")
     parser.add_argument("--device", default=None)
     parser.add_argument("--max-possessor-distance-px", type=float, default=DEFAULT_MAX_POSSESSOR_DISTANCE_PX)
     parser.add_argument("--hysteresis-frames", type=int, default=DEFAULT_HYSTERESIS_FRAMES)
@@ -927,9 +1295,20 @@ def main() -> None:
 
     event_classifier = None
     if not args.skip_events:
-        from core.events import EventClassifier
+        # Ambos backends cumplen el mismo contrato (predict/predict_window ->
+        # EventPrediction), así que analyze_match no distingue cuál recibe.
+        if args.events_backend in ("videoarm", "direct", "hybrid"):
+            from core.events_vllm import DirectVLMEventClassifier, HybridEventClassifier, VideoARMEventClassifier
 
-        event_classifier = EventClassifier(device=args.device)
+            event_classifier = {
+                "videoarm": VideoARMEventClassifier,
+                "direct": DirectVLMEventClassifier,
+                "hybrid": HybridEventClassifier,
+            }[args.events_backend]()
+        else:
+            from core.events import EventClassifier
+
+            event_classifier = EventClassifier(device=args.device)
 
     telemetry, possession_records = analyze_match(
         source_video=args.source,
