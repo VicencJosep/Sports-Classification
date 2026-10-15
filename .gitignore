@@ -63,3 +63,9 @@ Soccer_Master/SoccerMaster/models/deformable_detr/ops/modules/*
 !Soccer_Master/SoccerMaster/models/deformable_detr/ops/modules/ms_deform_attn.py
 
 yolo11x.pt
+# Pesos base que Ultralytics descarga en la raíz al entrenar (yolo11s, yolo26n...)
+/yolo*.pt
+# Backend FastAPI (backend/): entorno propio, datos subidos y salidas de análisis
+backend/.venv/
+backend/storage/
+.pytest_cache/

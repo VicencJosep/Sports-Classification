@@ -1,0 +1,67 @@
+{
+ "source_video": "datasets/clips_analisis/shots_on_target/shoton12.mp4",
+ "tracks_jsonl": "tracks.jsonl",
+ "embedder": "prtreid",
+ "embedding_dim": 256,
+ "n_clusters": 2,
+ "random_state": 0,
+ "teams": [
+  {
+   "tracker_id": 1,
+   "team_cluster": 1
+  },
+  {
+   "tracker_id": 2,
+   "team_cluster": 0
+  },
+  {
+   "tracker_id": 3,
+   "team_cluster": 1
+  },
+  {
+   "tracker_id": 4,
+   "team_cluster": 1
+  },
+  {
+   "tracker_id": 5,
+   "team_cluster": 1
+  },
+  {
+   "tracker_id": 6,
+   "team_cluster": 0
+  },
+  {
+   "tracker_id": 7,
+   "team_cluster": 0
+  },
+  {
+   "tracker_id": 8,
+   "team_cluster": 0
+  },
+  {
+   "tracker_id": 9,
+   "team_cluster": 1
+  },
+  {
+   "tracker_id": 10,
+   "team_cluster": 0
+  },
+  {
+   "tracker_id": 12,
+   "team_cluster": 1
+  }
+ ],
+ "excluded": [
+  {
+   "tracker_id": 11,
+   "reason": "never_player"
+  },
+  {
+   "tracker_id": 13,
+   "reason": "never_player"
+  }
+ ],
+ "n_frames_processed": 50,
+ "n_crops_embedded": 530,
+ "n_crops_skipped_degenerate": 0
+}

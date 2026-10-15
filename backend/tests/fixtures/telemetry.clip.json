@@ -1,0 +1,46 @@
+{
+ "source_video": "datasets/clips_analisis/shots_off_target/shotoff110.mp4",
+ "event": {
+  "video_path": "datasets/clips_analisis/shots_off_target/shotoff110.mp4",
+  "label": "shot",
+  "confidence": 0.4368162470973258,
+  "probabilities": {
+   "background_close-up_behind_the_goal": 0.0012742413971512923,
+   "background_close-up_player_or_field_referee": 0.06482390457705917,
+   "background_close-up_side_staff": 0.08305894920976045,
+   "background_main_camera_center": 0.03744595364504895,
+   "background_main_camera_left": 0.0013630410753314654,
+   "background_other": 0.015504512331068466,
+   "background_public": 0.05500913230814666,
+   "card": 0.012735794148339427,
+   "corner": 0.11372782653161119,
+   "foul": 0.02467740188834721,
+   "goal": 0.12545499231737803,
+   "kick-off": 0.0007610882772257841,
+   "penalty": 0.020093937221896306,
+   "shot": 0.4368162470973258,
+   "substitution": 0.0010811398693699851,
+   "throw-in": 0.006171838104939138
+  },
+  "is_background": false
+ },
+ "ball_actions": [
+  {
+   "frame_idx": 34,
+   "tracker_id": 10,
+   "label": "pass",
+   "confidence": 0.552110493183136,
+   "probabilities": {
+    "pass": 0.552110493183136,
+    "drive": 0.25739967823028564,
+    "high_pass": 0.021473322063684464,
+    "header": 0.022792786359786987,
+    "throw_in": 0.0011885658605024219,
+    "background": 0.14503520727157593
+   },
+   "is_background": false
+  }
+ ],
+ "n_frames": 75,
+ "n_possession_changes": 1
+}

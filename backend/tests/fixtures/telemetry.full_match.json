@@ -1,0 +1,162 @@
+{
+ "source_video": "ground_truth/2019-10-01_Middlesbrough-Preston_North_End-720p-trim.mp4",
+ "events": [
+  {
+   "label": "kick-off",
+   "start_s": 0.0,
+   "end_s": 6.0,
+   "peak_confidence": 0.5884066983101406,
+   "mean_confidence": 0.5884066983101406,
+   "n_windows": 1
+  },
+  {
+   "label": "foul",
+   "start_s": 24.0,
+   "end_s": 30.0,
+   "peak_confidence": 0.20293161610713248,
+   "mean_confidence": 0.20293161610713248,
+   "n_windows": 1
+  },
+  {
+   "label": "throw-in",
+   "start_s": 33.0,
+   "end_s": 42.0,
+   "peak_confidence": 0.9329670394279825,
+   "mean_confidence": 0.9074490508625805,
+   "n_windows": 2
+  },
+  {
+   "label": "foul",
+   "start_s": 39.0,
+   "end_s": 45.0,
+   "peak_confidence": 0.5166587349164372,
+   "mean_confidence": 0.5166587349164372,
+   "n_windows": 1
+  },
+  {
+   "label": "foul",
+   "start_s": 54.0,
+   "end_s": 60.0,
+   "peak_confidence": 0.2253350634557269,
+   "mean_confidence": 0.2253350634557269,
+   "n_windows": 1
+  },
+  {
+   "label": "foul",
+   "start_s": 66.0,
+   "end_s": 75.0,
+   "peak_confidence": 0.4562227626838181,
+   "mean_confidence": 0.3340738190377063,
+   "n_windows": 2
+  }
+ ],
+ "ball_actions": [
+  {
+   "frame_idx": 22,
+   "tracker_id": 14,
+   "label": "pass",
+   "confidence": 0.9991857801622633,
+   "probabilities": {
+    "pass": 0.9991857801622633,
+    "drive": 0.0005417599066078835,
+    "high_pass": 0.0001206196257648125,
+    "header": 3.2789719532166726e-05,
+    "throw_in": 0.0001190505858318052
+   },
+   "is_background": false,
+   "spot_score": 0.96923828125
+  },
+  {
+   "frame_idx": 50,
+   "tracker_id": 6,
+   "label": "drive",
+   "confidence": 0.9806675377838174,
+   "probabilities": {
+    "pass": 0.01660964375091808,
+    "drive": 0.9806675377838174,
+    "high_pass": 0.002120736894589079,
+    "header": 0.00025264229778223184,
+    "throw_in": 0.00034943927289307543
+   },
+   "is_background": false,
+   "spot_score": 0.986328125
+  },
+  {
+   "frame_idx": 72,
+   "tracker_id": 6,
+   "label": "pass",
+   "confidence": 0.9994525859168244,
+   "probabilities": {
+    "pass": 0.9994525859168244,
+    "drive": 0.000309854209997817,
+    "high_pass": 3.217433046702046e-05,
+    "header": 0.00019500118633267874,
+    "throw_in": 1.0384356378071455e-05
+   },
+   "is_background": false,
+   "spot_score": 0.9912109375
+  },
+  {
+   "frame_idx": 104,
+   "tracker_id": 20,
+   "label": "drive",
+   "confidence": 0.9981539348385966,
+   "probabilities": {
+    "pass": 0.0013995551177692505,
+    "drive": 0.9981539348385966,
+    "high_pass": 0.0001303465485043785,
+    "header": 0.0001575203165812288,
+    "throw_in": 0.0001586431785484931
+   },
+   "is_background": false,
+   "spot_score": 0.994140625
+  },
+  {
+   "frame_idx": 190,
+   "tracker_id": 13,
+   "label": "high_pass",
+   "confidence": 0.9746225611915191,
+   "probabilities": {
+    "pass": 0.024816754173716083,
+    "drive": 0.00016916970020372401,
+    "high_pass": 0.9746225611915191,
+    "header": 9.85605064263129e-05,
+    "throw_in": 0.0002929544281346792
+   },
+   "is_background": false,
+   "spot_score": 0.953125
+  },
+  {
+   "frame_idx": 338,
+   "tracker_id": 33,
+   "label": "drive",
+   "confidence": 0.9855975022385449,
+   "probabilities": {
+    "pass": 0.012140931042315197,
+    "drive": 0.9855975022385449,
+    "high_pass": 0.0006474439437121084,
+    "header": 0.0004986482474431346,
+    "throw_in": 0.0011154745279846764
+   },
+   "is_background": false,
+   "spot_score": 0.841796875
+  },
+  {
+   "frame_idx": 999,
+   "tracker_id": -1,
+   "label": "pass",
+   "confidence": 0.9991857801622633,
+   "probabilities": {
+    "pass": 0.9991857801622633,
+    "drive": 0.0005417599066078835,
+    "high_pass": 0.0001206196257648125,
+    "header": 3.2789719532166726e-05,
+    "throw_in": 0.0001190505858318052
+   },
+   "is_background": false,
+   "spot_score": 0.96923828125
+  }
+ ],
+ "n_frames": 30180,
+ "n_possession_changes": 375
+}
