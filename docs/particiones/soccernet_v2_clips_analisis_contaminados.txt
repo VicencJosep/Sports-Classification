@@ -1,0 +1,15 @@
+# Partidos de datasets/clips_analisis/ que SÍ están en el entrenamiento del SVC (13 de 70): sus clips no valen
+# para evaluar el SVC ni ningún modelo entrenado con dataset_vjepa_backup.
+2015-12-19 - 18-00 Chelsea 3 - 1 Sunderland
+2016-01-03 - 16-30 Crystal Palace 0 - 3 Chelsea
+2016-03-19 - 18-00 Chelsea 2 - 2 West Ham
+2016-04-09 - 19-30 Manchester City 2 - 1 West Brom
+2016-05-07 - 17-00 Sunderland 3 - 2 Chelsea
+2016-08-14 - 18-00 Arsenal 3 - 4 Liverpool
+2016-08-20 - 17-00 Burnley 2 - 0 Liverpool
+2016-10-14 - 21-30 Dortmund 1 - 1 Hertha Berlin
+2017-01-31 - 23-00 Liverpool 1 - 1 Chelsea
+2017-02-11 - 17-30 Darmstadt 2 - 1 Dortmund
+2017-02-26 - 23-00 Marseille 1 - 5 Paris SG
+2017-03-12 - 23-00 Lorient 1 - 2 Paris SG
+2017-05-21 - 21-00 Barcelona 4 - 2 Eibar
