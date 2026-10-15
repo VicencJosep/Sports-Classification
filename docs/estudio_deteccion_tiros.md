@@ -1,7 +1,7 @@
 # Estudio: detección de tiros y acciones de balón en partido completo
 
-Resumen de todas las mediciones hechas entre el 28 de septiembre y el 5 de octubre de 2026
-(rama `feat/T-DEED`). Objetivo: **estadística automática de tiros** (da igual si van dentro o
+Resumen de todas las mediciones hechas entre el 28 de septiembre y el 13 de octubre de 2026
+(ramas `feat/T-DEED` y `feat/panorama-shots`). Objetivo: **estadística automática de tiros** (da igual si van dentro o
 fuera), es decir, manda la precisión. Todos los números de este documento se pueden reproducir
 con los scripts de `scripts/shot_benchmark/`; los ficheros de resultados están en
 `output/shot_benchmark/` (no versionado).
@@ -124,6 +124,8 @@ ligas y realizaciones solo se podrá medir con partidos anotados por nosotros.
 | R3D-18 acciones de balón v2 | `models/r3d18_ball_actions-v2.pt` | 6 EFL (val Middlesbrough) | 6 clases, sin tiro ni centro |
 | T-DEED `SoccerNetBall_test` | `models/tdeed/SoccerNetBall_test/` | 4 EFL, val Middlesbrough | RegNetY-200MF; el de evaluación limpia |
 | T-DEED `SoccerNetBall_challenge2` | `models/tdeed/SoccerNetBall_challenge2/` | 6 EFL, val Middlesbrough | RegNetY-800MF; el de producción; 9-15 min/partido |
+| T-DEED `SNB_pano1` | `models/tdeed/SNB_pano1/` | `challenge2` + 5 partidos de SoccerTrack v2 con nuestra cámara virtual (§10) | Solo para panorámica; no medido en TV |
+| YOLO11s `yolo11s_pano` (balón en panorámica) | `output/ball_panorama/runs/yolo11s_pano/weights/best.pt` | Pseudoetiquetas de SoccerTrack v2, entrenamiento y validación (§10) | Ventanas de 1024 px, 0,07 s/frame |
 | Qwen3.5-9B (vLLM fp8) | `scripts/serve_events_vllm.sh`, puerto 8010 | — | VideoARM encima |
 | Qwen3-Omni-30B-A3B-Thinking AWQ-4bit | `scripts/serve_events_omni.sh`, puerto 8002 | — | Vídeo solo a 224p (OOM del encoder a más) |
 
@@ -179,13 +181,89 @@ recupera pases, conducciones y pases altos a un nivel cercano al de TV, con meno
 umbrales habría que bajarlos); (3) los tiros no: el modelo prácticamente no los ve (un solo tiro llega a 0,20; el resto ≤ 0,02) y
 en el golpeo los clasifica como pase o conducción, por el tamaño de los jugadores y del balón; (4) para tiros en panorámica hace falta
 ajuste fino con SoccerTrack v2 (21.000 acciones, 10 partidos) o una cámara virtual con más aumento,
-que no gana resolución real. Decisión pendiente del usuario.
+que no gana resolución real. Se eligió el ajuste fino, con una cámara virtual movida por un
+detector de balón propio: ver §10.
 
-## 10. Pendiente
+## 10. Panorámica con cámara propia y ajuste fino de T-DEED (6–13 oct 2026)
+
+Rama `feat/panorama-shots`. Los 10 partidos de SoccerTrack v2 con la partición oficial
+(`docs/particion_datasets.md`): entrenamiento 118575, 118576, 118577, 118578 y 128058 (el partido
+nocturno 117092 se dejó fuera); validación 117093 y 132877; evaluación 128057 y 132831. Scripts:
+`scripts/shot_benchmark/` (`panorama_*.py`, `vcam_path.py`, `tdeed_finetune*.py`, `run_tdeed_*.sh`) y
+`scripts/ball_detector/make_pseudo_labels.py`. Resultados en `output/panorama_views/` y
+`output/panorama_ball/` (no versionados).
+
+**Cámara de referencia.** Recorte de 796×448 a resolución nativa (sin reescalar) guiado por la pista de
+balón del dataset. Esa pista está reconstruida entre eventos anotados: vale como referencia, nunca como
+entrada, y en producción no existe. En 132831 y 132877 su render quedó degradado (con el balón fuera,
+la pista se aparca en (0, 0) y la cámara se va al círculo central).
+
+**Pieza 1, balón.** YOLO11x COCO a 640 px no ve el balón de la panorámica (8 px → 1 px). Detector
+propio `yolo11s_pano`: YOLO11s por ventanas de 1024 px, entrenado con pseudoetiquetas (pista del
+dataset confirmada por YOLO11x) de los partidos de entrenamiento y validación.
+
+**Pieza 2, cámara.** Pista Viterbi sobre los candidatos del detector (descarta saltos físicamente
+imposibles a objetos casi fijos) y trayectoria de cámara L1 con zona muerta. Tiros en validación, AP
+±3 s: cámara directa sobre la mejor detección 51,6 % → Viterbi + media 65,2 % → **Viterbi + L1
+70,7 %** (referencia 75,7 %). La cámara tiene el balón en el encuadre en el 97-98 % de los eventos
+anotados. Ajuste de cámara cerrado aquí para no sobreajustar la validación.
+
+**Pieza 3, ajuste fino de T-DEED (`SNB_pano1`).** Desde `SoccerNetBall_challenge2`, con los renders de
+nuestra cámara de los 5 partidos de entrenamiento (10.441 acciones, 158 tiros con goles): 8 épocas de
+2.000 clips de 100 frames, lr 1e-4, solo la cabeza de 12 clases; checkpoint elegido por mAP en
+validación (época 5). 4 h en la 4090 con 18,7 GB de VRAM; el escaneo posterior usa ~6,5 GB.
+
+Tiros (SHOT + GOAL, AP ±3 s, cabeza de acciones de balón):
+
+| Partidos | Tiros | Nuestra cámara, base | Nuestra cámara, afinado | Referencia, base / afinado |
+|---|---|---|---|---|
+| Validación (117093 + 132877) | 56 | 70,7 % | 73,2 % | 75,7 % / 69,2 % |
+| Evaluación 128057 | 27 | 59,3 % | 60,5 % | 79,4 % / 79,5 % |
+| Evaluación 132831 (gran angular) | 40 | 34,5 % | 59,3 % | degradada |
+| Evaluación, los dos | 67 | 41,6 % | **55,2 %** | — |
+
+Punto de trabajo con nuestra cámara (mejor umbral de cada modelo): en validación, 37 aciertos y 25
+falsas alarmas → 36 y 12; en evaluación, 28 y 28 → 44 y 31.
+
+Por clase, nuestra cámara, AP ±1 s (picos con NMS 0,5 s; aquí SHOT no incluye goles ni suavizado, así
+que no se compara con la tabla anterior):
+
+| Clase | Validación, base | Validación, afinado | Evaluación, base | Evaluación, afinado |
+|---|---|---|---|---|
+| PASS | 84 % | 92 % | 80 % | 89 % |
+| DRIVE | 84 % | 90 % | 77 % | 85 % |
+| HIGH PASS | 52 % | 78 % | 50 % | 69 % |
+| THROW IN | 76 % | 92 % | 54 % | 74 % |
+| CROSS | 65 % | 76 % | 39 % | 56 % |
+| SHOT | 38 % | 50 % | 26 % | 40 % |
+| OUT | 16 % | 40 % | 13 % | 37 % |
+| FREE KICK | 5 % | 20 % | 4 % | 33 % |
+| BALL PLAYER BLOCK | 8 % | 15 % | 3 % | 6 % |
+| PLAYER SUCCESSFUL TACKLE | 4 % | 7 % | 2 % | 7 % |
+| GOAL (8 / 10 casos) | 15 % | 17 % | 4 % | 7 % |
+| HEADER (7 / 5 casos) | 5 % | 35 % | 1 % | 4 % |
+| **mAP (clases con ≥ 20)** | 43 % | **56 %** | 35 % | **50 %** |
+
+Conclusiones:
+
+1. El ajuste fino mejora todas las clases en partidos que no ha visto (mAP 35 → 50 % en evaluación) y
+   hace usable el partido de gran angular, cuyo montaje de cámara no estaba en el entrenamiento.
+2. En tiros sobre un partido normal (128057) no mueve el AP ±3 s: el mismo modelo con la cámara de
+   referencia da 79,5 %. El hueco que queda es la cámara: con la nuestra, en uno de cada ocho tiros el
+   balón no está en el encuadre en el golpeo (cobertura de tiros 87,7 % frente a 96,5 %).
+3. `SNB_pano1` es específico de la panorámica: con la cámara de referencia empeora en tiros y no se ha
+   medido en TV. En TV sigue `SoccerNetBall_challenge2`.
+4. Clases: PLAYER SUCCESSFUL TACKLE y BALL PLAYER BLOCK no sirven con ninguna cámara; FREE KICK queda
+   intermedia; HEADER y GOAL tienen muy pocos casos para juzgarlas solas (GOAL va con los tiros).
+5. El partido nocturno (117092) no se ha abordado.
+
+## 11. Pendiente
 
 - Fila del Omni en §2b (necesita la GPU entera).
 - Cuando T-DEED marca un tiro, la acción de balón de ese instante debe ser "tiro" (hoy sale "conducción").
 - Medir si el jugador asignado a cada acción es el correcto.
-- Panorámica: decidir entre ajuste fino con SoccerTrack v2 o descartar tiros en panorámica (ver §9); en producción haría falta un detector de balón para la cámara virtual.
+- Panorámica (§10): integrarla en `main.py` como proyecto aparte (detector `yolo11s_pano` → Viterbi + L1 →
+  render 796×448 → T-DEED `SNB_pano1`; `core/ball_spotting.py` aún no conoce ese checkpoint); que la cámara
+  acompañe el golpeo; decidir qué clases se emiten (propuesta: fuera TACKLE y BALL PLAYER BLOCK); partido nocturno.
 - Tarjetas, sustituciones y saque inicial: necesita anotar eventos en partidos propios.
 - Ajuste fino de T-DEED con datos propios cuando se sepa qué falla en producción.

@@ -4,7 +4,9 @@ Ball out of play, Throw-in, Foul, Indirect/Direct free-kick, Corner, Yellow card
 model.predict() del repo descarta la segunda; aquí se replica su post-proceso para ambas.
 
 Uso (cwd = models/tdeed/T-DEED):  python tdeed_scan_heads.py MODELO VIDEO [VIDEO...] [--max-clips N]
-Salida: /app/output/shot_benchmark/tdeed/MODELO_heads/<partido> [<mitad>].npz  (probs, probs_sn, classes, classes_sn)"""
+                                  [--out-tag _x] [--batch-size N]
+Salida: /app/output/shot_benchmark/tdeed/MODELO_heads<out-tag>/<partido> [<mitad>].npz  (probs, probs_sn, classes, classes_sn)
+--batch-size 1 reduce el pico de VRAM cuando otro proceso ocupa la GPU (por defecto, el del config)."""
 import argparse, os, sys, time
 from pathlib import Path
 import numpy as np
@@ -17,14 +19,17 @@ from util.dataset import load_classes
 from model.model import TDEEDModel
 from dataset.frame import ActionSpotInferenceDataset
 
-CONFIG_OF = {"SoccerNetBall_test": "SoccerNetBall_challenge1", "SoccerNetBall_challenge2": "SoccerNetBall_challenge2"}
+CONFIG_OF = {"SoccerNetBall_test": "SoccerNetBall_challenge1", "SoccerNetBall_challenge2": "SoccerNetBall_challenge2"}   # otros nombres (afinados): config challenge2
 STRIDE = 2
 ap = argparse.ArgumentParser()
 ap.add_argument("model"); ap.add_argument("videos", nargs="+"); ap.add_argument("--max-clips", type=int, default=None)
+ap.add_argument("--out-tag", default=""); ap.add_argument("--batch-size", type=int, default=None)
 a = ap.parse_args()
 
-cfg = load_json(f"config/SoccerNetBall/{CONFIG_OF[a.model]}.json")
+cfg = load_json(f"config/SoccerNetBall/{CONFIG_OF.get(a.model, 'SoccerNetBall_challenge2')}.json")
 args = argparse.Namespace(**cfg); args.crop_dim = None
+if a.batch_size:
+    args.batch_size = a.batch_size
 names = lambda f: ["background"] + [c for c, _ in sorted(load_classes(f).items(), key=lambda kv: kv[1])]
 cls1, cls2 = names("data/soccernetball/class.txt"), names("data/soccernet/class.txt")
 model = TDEEDModel(args=args)
@@ -56,7 +61,7 @@ def predict_heads(frames):
     return out
 
 
-out_dir = Path(f"/app/output/shot_benchmark/tdeed/{a.model}_heads"); out_dir.mkdir(parents=True, exist_ok=True)
+out_dir = Path(f"/app/output/shot_benchmark/tdeed/{a.model}_heads{a.out_tag}"); out_dir.mkdir(parents=True, exist_ok=True)
 for video in a.videos:
     stem = Path(video).stem
     out = out_dir / (f"{Path(video).parent.name}.npz" if stem == "720p" else f"{Path(video).parent.name} [{stem}].npz")
@@ -89,4 +94,5 @@ for video in a.videos:
     np.savez(tmp, probs=(acc[0] / div).astype(np.float16), probs_sn=(acc[1] / div).astype(np.float16),
              classes=np.array(cls1), classes_sn=np.array(cls2), stride=STRIDE)
     tmp.rename(out)
-    print(f"FIN {out.name} en {time.perf_counter() - t0:.0f}s", flush=True)
+    print(f"FIN {out.name} en {time.perf_counter() - t0:.0f}s | VRAM pico {torch.cuda.max_memory_reserved() / 2**30:.1f} GB "
+          f"reservada por PyTorch (+ ~0,5 GB de contexto CUDA)", flush=True)
