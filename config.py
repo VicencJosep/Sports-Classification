@@ -42,6 +42,12 @@ class TrackingConfig:
 
     detector: str = "hybrid"                # "hybrid" | "soccermaster" | "yolo"
     yolo_model_path: str = "yolo11x.pt"
+    ball_model_path: str | None = None      # None = YOLO11x COCO. models/ball/yolo11s_snt_ball.pt (ajustado con SoccerNet
+                                             # Tracking) acierta más en TV (top-1 78% frente a 62%) pero en YouTube su mejor
+                                             # detección salta a botas y fondo: no usarlo sin coherencia temporal (13-oct-2026)
+    ball_imgsz: int = 1280                  # resolución de YOLO para el balón (= core.tracking.DEFAULT_BALL_IMGSZ;
+                                             # 640 dejaba el balón de un 720p en 3-5 px: 54% de frames con balón
+                                             # frente a 70% a 1280, medido el 11-oct-2026)
     device: str | None = None               # None -> auto (cuda si hay)
     confidence: float = 0.3                 # umbral personas
     ball_confidence: float = 0.15           # umbral (laxo) para el balón
@@ -50,6 +56,11 @@ class TrackingConfig:
     lost_track_buffer: int = 30
     minimum_matching_threshold: float = 0.8
     frame_rate: int | None = None            # None -> auto-detectar del vídeo real (ver process_video)
+    static_ball_window_frames: int = 750     # core.tracking.StaticBallFilter: un "balón" clavado en el mismo píxel
+    static_ball_min_history_frames: int = 150  # frames de historial antes de empezar a filtrar (~6 s a 25 fps)
+    static_ball_min_presence: float = 0.7    # en >= 70% de los últimos 750 frames es un escudo/logo del marcador,
+                                             # no el balón (medido el 12-oct-2026: sin esto el escudo del marcador
+                                             # ganaba al balón real en el 45-80% de los frames de un juvenil de YouTube)
 
 
 @dataclass(frozen=True)
@@ -108,6 +119,22 @@ class BallSpottingConfig:
     ligas (0.5 -> P 75% / R 73%). ``action_min_score=0.5`` -> F1 90% en
     ground_truth/ (0.3 -> 84%); elegido sobre ese mismo partido, así que es
     algo optimista.
+
+    Fuera del dominio EFL (medido el 11-oct-2026 en dos partidos juveniles de
+    YouTube) T-DEED dispara en los mismos sitios pero con menos confianza:
+    ``action_min_score=0.5`` deja 5,5 y 3,1 acciones/min (lo esperable son
+    15-20) y pierde sobre todo conducciones; 0.2-0.3 recupera la densidad, a
+    falta de ground truth para fijar la precisión. ``main.py
+    --action-min-score`` lo sobreescribe por ejecución y
+    ``scripts/respot_telemetry.py`` regenera la telemetría desde las cachés
+    para comparar umbrales sin re-inferir.
+
+    ``throw_in_min_score``: umbral del saque de banda como EVENTO de la línea
+    temporal (sustituye al "throw-in" de V-JEPA2, que fuera de la EFL dispara
+    4-5 veces más de la cuenta). A 0.5 salen 37-38 por partido juvenil, el
+    orden de magnitud real; ``None`` desactiva la sustitución y deja el de
+    V-JEPA2. Como acción de balón atribuida a un jugador sigue rigiendo
+    ``action_min_score``.
     """
 
     repo_dir: Path = PROJECT_ROOT / "models" / "tdeed" / "T-DEED"
@@ -115,7 +142,8 @@ class BallSpottingConfig:
     model_name: str = "SoccerNetBall_challenge2"
     shot_min_score: float = 0.3
     goal_min_score: float = 0.3
-    event_nms_s: float = 4.0                # dos tiros a menos de 4 s son el mismo pico
+    throw_in_min_score: float | None = 0.5  # None -> el saque de banda sigue saliendo de V-JEPA2
+    event_nms_s: float = 4.0                # dos tiros/saques a menos de 4 s son el mismo pico
     event_smooth_frames: int = 6            # ~0,5 s (frames muestreados a 12,5 fps)
     action_min_score: float = 0.5
     action_nms_s: float = 0.5               # ~12 frames: acciones seguidas del mismo tipo

@@ -956,8 +956,10 @@ def analyze_full_match(
     Con ``spot_scores`` (caché de T-DEED, ``core/ball_spotting.py``):
 
     * ``event_spot_params`` (``{etiqueta T-DEED: (min_score, nms_s)}``): los
-      eventos de esas clases (shot/goal) salen de T-DEED y los tramos de
-      ``event_classifier`` con esas mismas etiquetas se descartan.
+      eventos de esas clases (shot/goal, y throw-in si
+      ``config.BallSpottingConfig.throw_in_min_score`` no es None) salen de
+      T-DEED y los tramos de ``event_classifier`` con esas mismas etiquetas se
+      descartan.
     * ``ball_action_spot_params`` (``(min_score, nms_s)``): las acciones de
       balón se disparan en los picos de T-DEED en vez de en los cambios de
       posesión (ver ``_analyze_possession_and_ball_actions``).

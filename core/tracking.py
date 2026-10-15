@@ -44,6 +44,7 @@ Uso rápido (standalone, desde la raíz del proyecto):
 
 from __future__ import annotations
 
+import collections
 import json
 import logging
 import os
@@ -73,6 +74,30 @@ ROLE_TO_CLASS_ID: dict[str, int] = {
 }
 CLASS_ID_TO_ROLE: dict[int, str] = {v: k for k, v in ROLE_TO_CLASS_ID.items()}
 BALL_CLASS_ID: int = ROLE_TO_CLASS_ID["ball"]
+
+# Resolución de entrada de YOLO para el balón. Ultralytics usa 640 por defecto,
+# que en un 720p deja el balón en 3-5 px. Medido el 11-oct-2026 sobre 2 min de
+# un partido juvenil de YouTube a 720p (YOLO11x COCO, "sports ball" >= 0.15):
+# 640 -> balón en el 54% de los frames (20 ms/frame), 960 -> 68% (32 ms),
+# 1280 -> 70% (40 ms). 1280 es la resolución nativa del 720p: no se inventa
+# nada, solo deja de tirar píxeles.
+DEFAULT_BALL_IMGSZ: int = 1280
+
+# Pesos del detector de balón: el ajustado con SoccerNet Tracking (una sola
+# clase, "ball") si existe; si no, el YOLO11x COCO genérico ("sports ball").
+# Medido el 12-oct-2026 sobre 1.200 frames de los clips de test de SoccerNet
+# Tracking (TV 1080p, partidos no vistos), conf >= 0.15: COCO a 1280 px recall
+# 67% / precisión 48%; ajustado a 1280 px recall 80% / precisión 77%. En dos
+# juveniles de YouTube el ajustado ve el balón en el 85-98% de los frames
+# frente al 63-73% de COCO (output/ball_experiments/CONCLUSIONES.md). Se
+# entrena con scripts/ball_detector/{prepare_soccernet_tracking_ball,train_ball_yolo}.py.
+# NO es el detector por defecto: en el partido completo del Espanyol (13-oct-2026)
+# vio balón en el 88% de los frames de juego, pero la mejor detección saltaba a
+# botas, farolas y árboles del fondo (23% de frames consecutivos con saltos de
+# >80 px, 412 cambios de poseedor por minuto frente a 80 con COCO a 1280). Hace
+# falta coherencia temporal en _resolve_ball antes de usarlo; se activa con
+# build_detector(ball_model_path=DEFAULT_BALL_MODEL_PATH) o --ball-model.
+DEFAULT_BALL_MODEL_PATH: Path = Path(__file__).resolve().parents[1] / "models" / "ball" / "yolo11s_snt_ball.pt"
 
 _PROJECT_ROOT: Path = Path(__file__).resolve().parents[1]
 _DEFAULT_SM_DIR: Path = _PROJECT_ROOT / "Soccer_Master" / "SoccerMaster"
@@ -225,6 +250,11 @@ class YoloDetector:
         device: "cuda", "cuda:0", "cpu"... None deja elegir a Ultralytics.
         confidence: umbral mínimo global de inferencia (el filtrado fino por
             clase lo hace PlayerTracker).
+        imgsz: lado mayor de la imagen que ve YOLO (ver ``DEFAULT_BALL_IMGSZ``:
+            a 640 el balón de un 720p casi desaparece).
+        ball_class_id / person_class_id: ids de clase del checkpoint. Por defecto
+            los de COCO (32 / 0); para un detector de balón de una sola clase
+            (``DEFAULT_BALL_MODEL_PATH``) son 0 / None (sin personas).
     """
 
     _COCO_PERSON: int = 0
@@ -235,14 +265,22 @@ class YoloDetector:
         model_path: str = "yolo11x.pt",
         device: Optional[str] = None,
         confidence: float = 0.1,
+        imgsz: int = DEFAULT_BALL_IMGSZ,
+        ball_class_id: int = _COCO_BALL,
+        person_class_id: Optional[int] = _COCO_PERSON,
     ) -> None:
         from ultralytics import YOLO  # import perezoso: solo si se usa este detector
 
-        logger.info("Cargando YOLO %s ...", model_path)
+        logger.info("Cargando YOLO %s (imgsz=%d, clase balón=%d, clase persona=%s) ...",
+                    model_path, imgsz, ball_class_id, person_class_id)
         self.model = YOLO(model_path)
         if device:
             self.model.to(device)
         self.confidence = confidence
+        self.imgsz = imgsz
+        self.ball_class_id = ball_class_id
+        self.person_class_id = person_class_id
+        self._classes = [ball_class_id] if person_class_id is None else [person_class_id, ball_class_id]
 
     @property
     def chunk_size(self) -> int:
@@ -254,12 +292,13 @@ class YoloDetector:
             raw = self.model(
                 frame,
                 conf=self.confidence,
-                classes=[self._COCO_PERSON, self._COCO_BALL],
+                classes=self._classes,
+                imgsz=self.imgsz,
                 verbose=False,
             )[0]
             dets = sv.Detections.from_ultralytics(raw)
             roles = [
-                "ball" if cid == self._COCO_BALL else "player"
+                "ball" if cid == self.ball_class_id else "player"
                 for cid in dets.class_id
             ]
             dets.class_id = np.asarray(
@@ -489,6 +528,65 @@ class HybridDetector:
 #  Tracker
 # --------------------------------------------------------------------------- #
 
+class StaticBallFilter:
+    """Descarta detecciones de balón clavadas en el mismo píxel durante mucho tiempo.
+
+    Un balón real con una cámara que panea no se queda quieto en píxeles 20-30 s
+    seguidos; el escudo del marcador, un logo o un gráfico, sí. Medido el
+    12-oct-2026 con el detector ajustado (SoccerNet Tracking) en un juvenil de
+    YouTube: el escudo del marcador superaba al balón real como mejor detección
+    en el 45-80% de los frames (conf ~0,5), lo que habría llevado la posesión
+    al marcador en vez de al campo.
+
+    Guarda una ventana de ``window_frames`` frames con las celdas (``cell_px``
+    px) donde hubo alguna detección, dilatadas a sus 8 vecinas al registrarlas
+    (así una detección que baila entre dos celdas cuenta en las dos y no se
+    escapa por partir su presencia); una detección es estática si su celda ha
+    tenido detección en al menos ``min_presence`` de los frames de la ventana.
+    No filtra nada hasta tener ``min_history_frames`` frames de historial.
+    """
+
+    def __init__(
+        self,
+        window_frames: int = 750,
+        min_presence: float = 0.7,
+        cell_px: int = 8,
+        min_history_frames: int = 150,
+    ) -> None:
+        self.window_frames = window_frames
+        self.min_presence = min_presence
+        self.cell_px = cell_px
+        self.min_history_frames = min_history_frames
+        self._history: collections.deque = collections.deque()
+        self._counts: collections.Counter = collections.Counter()
+
+    def reset(self) -> None:
+        self._history.clear()
+        self._counts.clear()
+
+    def _cell(self, x: float, y: float) -> tuple[int, int]:
+        return (int(x // self.cell_px), int(y // self.cell_px))
+
+    def update(self, centers: Sequence[tuple[float, float]]) -> None:
+        """Registra las detecciones candidatas de ESTE frame (llamar en todos
+        los frames, también sin candidatas, para que la ventana avance)."""
+        cells: set[tuple[int, int]] = set()
+        for x, y in centers:
+            cx, cy = self._cell(x, y)
+            cells.update((cx + dx, cy + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1))
+        frozen = frozenset(cells)
+        self._history.append(frozen)
+        self._counts.update(frozen)
+        while len(self._history) > self.window_frames:
+            self._counts.subtract(self._history.popleft())
+
+    def is_static(self, x: float, y: float) -> bool:
+        n = len(self._history)
+        if n < self.min_history_frames:
+            return False
+        return self._counts.get(self._cell(x, y), 0) / n >= self.min_presence
+
+
 class PlayerTracker:
     """Orquesta Detector (inyectado) + ByteTrack.
 
@@ -505,6 +603,8 @@ class PlayerTracker:
         track_activation_threshold / lost_track_buffer / minimum_matching_threshold:
             hiperparámetros de ByteTrack (ver docs de supervision).
         frame_rate: fps nominal del vídeo (para el buffer de tracks perdidos).
+        static_ball_window_frames / static_ball_min_presence: ver ``StaticBallFilter``
+            (descarta "balones" clavados en el mismo píxel: escudos, logos).
     """
 
     def __init__(
@@ -517,11 +617,17 @@ class PlayerTracker:
         lost_track_buffer: int = 30,
         minimum_matching_threshold: float = 0.8,
         frame_rate: Optional[int] = None,
+        static_ball_window_frames: int = 750,
+        static_ball_min_presence: float = 0.7,
+        static_ball_min_history_frames: int = 150,
     ) -> None:
         self.detector = detector
         self.confidence = confidence
         self.ball_confidence = ball_confidence
         self.min_box_area = min_box_area
+        self._static_ball = StaticBallFilter(
+            static_ball_window_frames, static_ball_min_presence, min_history_frames=static_ball_min_history_frames
+        )
         self._track_activation_threshold = track_activation_threshold
         self._lost_track_buffer = lost_track_buffer
         self._minimum_matching_threshold = minimum_matching_threshold
@@ -632,6 +738,7 @@ class PlayerTracker:
             self.tracker = self._build_tracker(round(fps))
         else:
             self.tracker.reset()
+        self._static_ball.reset()
 
         logger.info(
             "Procesando %s — %dx%d @ %.1f fps, %s frames (chunk=%d, stride=%d)",
@@ -691,15 +798,23 @@ class PlayerTracker:
     def _resolve_ball(
         self, detections: sv.Detections
     ) -> tuple[sv.Detections, Optional[BallRecord]]:
-        """El balón se resuelve por frame: mejor detección sobre el umbral laxo."""
+        """El balón se resuelve por frame: mejor detección sobre el umbral laxo,
+        descartando antes las clavadas en el mismo píxel (``StaticBallFilter``)."""
         if len(detections) == 0:
+            self._static_ball.update(())
             return detections, None
         balls = detections[
             (detections.class_id == BALL_CLASS_ID)
             & (detections.confidence >= self.ball_confidence)
         ]
+        centers = [((x1 + x2) / 2, (y1 + y2) / 2) for x1, y1, x2, y2 in balls.xyxy] if len(balls) else []
+        self._static_ball.update(centers)
         if len(balls) == 0:
             return balls, None
+        keep = np.array([not self._static_ball.is_static(x, y) for x, y in centers], dtype=bool)
+        if not keep.any():
+            return balls[keep], None
+        balls = balls[keep]
 
         best = balls[int(np.argmax(balls.confidence))]
         x1, y1, x2, y2 = (float(v) for v in best.xyxy[0])
@@ -726,21 +841,36 @@ def build_detector(
     device: Optional[str] = None,
     yolo_model_path: str = "yolo11x.pt",
     sm_repo_dir: Path | str = _DEFAULT_SM_DIR,
+    ball_imgsz: int = DEFAULT_BALL_IMGSZ,
+    ball_model_path: Path | str | None = None,
 ) -> Detector:
     """Construye el detector por nombre ("hybrid" | "soccermaster" | "yolo").
 
     "hybrid" (recomendado): personas (rol + dorsal) de SoccerMaster y balón de
-    YOLO11x, porque el head GSR de SoccerMaster casi nunca detecta el balón.
+    YOLO a ``ball_imgsz`` (resolución nativa del 720p por defecto), porque el
+    head GSR de SoccerMaster casi nunca detecta el balón. El balón sale del
+    YOLO11x COCO genérico salvo que se pase ``ball_model_path`` (detector de una
+    clase, p. ej. ``DEFAULT_BALL_MODEL_PATH``) y ese fichero exista.
     """
     if name == "hybrid":
+        if ball_model_path and Path(ball_model_path).exists():
+            logger.info("Detector de balón: %s (ajustado, clase única)", ball_model_path)
+            ball_detector = YoloDetector(
+                model_path=str(ball_model_path), device=device, imgsz=ball_imgsz,
+                ball_class_id=0, person_class_id=None,
+            )
+        else:
+            logger.info("Detector de balón: %s (COCO 'sports ball'; no hay pesos ajustados en %s)",
+                        yolo_model_path, ball_model_path)
+            ball_detector = YoloDetector(model_path=yolo_model_path, device=device, imgsz=ball_imgsz)
         return HybridDetector(
             person_detector=SoccerMasterDetector(repo_dir=sm_repo_dir, device=device),
-            ball_detector=YoloDetector(model_path=yolo_model_path, device=device),
+            ball_detector=ball_detector,
         )
     if name == "soccermaster":
         return SoccerMasterDetector(repo_dir=sm_repo_dir, device=device)
     if name == "yolo":
-        return YoloDetector(model_path=yolo_model_path, device=device)
+        return YoloDetector(model_path=yolo_model_path, device=device, imgsz=ball_imgsz)
     raise ValueError(
         f"Detector desconocido: {name!r} (usa 'hybrid', 'soccermaster' o 'yolo')"
     )
@@ -794,6 +924,12 @@ def main() -> None:
     parser.add_argument("--sm-dir", default=str(_DEFAULT_SM_DIR),
                         help="Raíz del repo SoccerMaster")
     parser.add_argument("--yolo-model", default="yolo11x.pt")
+    parser.add_argument("--ball-model", default="",
+                        help="pesos de un detector de balón de una clase (solo --detector hybrid), p. ej. "
+                             f"{DEFAULT_BALL_MODEL_PATH}; vacío (por defecto) = YOLO11x COCO")
+    parser.add_argument("--ball-imgsz", type=int, default=DEFAULT_BALL_IMGSZ,
+                        help="resolución de entrada de YOLO para el balón (por defecto "
+                             f"{DEFAULT_BALL_IMGSZ}, la nativa de un 720p; 640 es la de Ultralytics)")
     parser.add_argument("--device", default=None)
     parser.add_argument("--stride", type=int, default=1)
     parser.add_argument("--max-frames", type=int, default=None)
@@ -811,6 +947,8 @@ def main() -> None:
         device=args.device,
         yolo_model_path=args.yolo_model,
         sm_repo_dir=args.sm_dir,
+        ball_imgsz=args.ball_imgsz,
+        ball_model_path=args.ball_model or None,
     )
     tracker = PlayerTracker(detector=detector, frame_rate=args.frame_rate)
 

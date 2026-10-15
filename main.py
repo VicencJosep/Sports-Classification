@@ -305,11 +305,31 @@ def _build_spot_kwargs(args: argparse.Namespace, cfg: config.PipelineConfig) -> 
             "SHOT": (spot_cfg.shot_min_score, spot_cfg.event_nms_s),
             "GOAL": (spot_cfg.goal_min_score, spot_cfg.event_nms_s),
         }
+        if spot_cfg.throw_in_min_score is not None:
+            # El saque de banda también sale de T-DEED; analyze_full_match
+            # descarta entonces los tramos "throw-in" de V-JEPA2.
+            kwargs["event_spot_params"]["THROW IN"] = (spot_cfg.throw_in_min_score, spot_cfg.event_nms_s)
         kwargs["event_spot_smooth_frames"] = spot_cfg.event_smooth_frames
     if use_for_actions:
         kwargs["ball_action_spot_params"] = (spot_cfg.action_min_score, spot_cfg.action_nms_s)
         kwargs["ball_action_label_source"] = args.ball_actions_label
     return kwargs
+
+
+def _apply_spot_overrides(args: argparse.Namespace, cfg: config.PipelineConfig) -> config.PipelineConfig:
+    """``--action-min-score`` / ``--throw-in-min-score`` -> copia de ``cfg`` con
+    esos umbrales de T-DEED (los dataclasses de config son frozen). Un
+    ``--throw-in-min-score`` negativo deja el saque de banda de V-JEPA2."""
+    from dataclasses import replace
+
+    changes: dict = {}
+    if args.action_min_score is not None:
+        changes["action_min_score"] = args.action_min_score
+    if args.throw_in_min_score is not None:
+        changes["throw_in_min_score"] = None if args.throw_in_min_score < 0 else args.throw_in_min_score
+    if not changes:
+        return cfg
+    return replace(cfg, ball_spotting=replace(cfg.ball_spotting, **changes))
 
 
 def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> None:
@@ -397,6 +417,15 @@ def main() -> None:
                         default="combined",
                         help="Con --ball-actions-trigger tdeed, quién pone la etiqueta: el R3D-18 "
                              "('classifier'), T-DEED ('spotter') o los dos ('combined')")
+    parser.add_argument("--action-min-score", type=float, default=None,
+                        help="Solo --mode full-match: score mínimo de T-DEED para disparar una acción "
+                             "de balón (por defecto config.BallSpottingConfig.action_min_score=0.5, "
+                             "elegido en la EFL; fuera de ese dominio 0.2-0.3 recupera la densidad "
+                             "real de pases y conducciones, ver config.py)")
+    parser.add_argument("--throw-in-min-score", type=float, default=None,
+                        help="Solo --mode full-match: score mínimo de T-DEED para el saque de banda "
+                             "como evento (por defecto config.BallSpottingConfig.throw_in_min_score="
+                             "0.5); un valor negativo deja el throw-in de V-JEPA2, como antes")
     parser.add_argument("--skip-homography", action="store_true",
                         help="No calibrar el campo (sin tracks_2d.jsonl ni radar.mp4)")
     parser.add_argument("--homography-stride", type=int, default=None,
@@ -433,7 +462,7 @@ def main() -> None:
     if not args.source.exists():
         parser.error(f"No existe: {args.source}")
 
-    cfg = config.PipelineConfig()
+    cfg = _apply_spot_overrides(args, config.PipelineConfig())
     if args.event_stride_s is None:
         args.event_stride_s = cfg.full_match.event_stride_s
     if args.publish_visibility is None:

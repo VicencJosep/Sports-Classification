@@ -158,7 +158,7 @@ Notas de diseño de `core/tracking.py`:
 - **Personas → ByteTrack** (IDs persistentes entre frames); **balón → mejor detección por frame** (ByteTrack pierde objetos pequeños y rápidos; la trayectoria se suavizará por interpolación en `homography.py`/`analytics`).
 - `anchor_xy` es el **bottom-center** de la caja: el punto de apoyo del jugador con el suelo, que es el que debe proyectarse con la matriz de homografía.
 - `process_video()` es un **generador**, pensado para encadenarse a colas asíncronas sin cargar el vídeo en memoria.
-- El balón de SoccerMaster casi nunca se detecta (dataset GSR centrado en personas); de ahí el `HybridDetector` por defecto, que combina personas de SoccerMaster con balón de YOLO11x.
+- El balón de SoccerMaster casi nunca se detecta (dataset GSR centrado en personas); de ahí el `HybridDetector` por defecto, que combina personas de SoccerMaster con balón de YOLO11x. Ese YOLO corre a 1280 px (`core.tracking.DEFAULT_BALL_IMGSZ`, la resolución nativa de un 720p): a los 640 por defecto de Ultralytics el balón medía 3-5 px y se detectaba en el 54% de los frames frente al 70% a 1280 (medido el 11-oct-2026 en un juvenil de YouTube; +20 ms/frame). Hay además un YOLO11s de una sola clase ajustado con SoccerNet Tracking (`models/ball/yolo11s_snt_ball.pt`, `core.tracking.DEFAULT_BALL_MODEL_PATH`, se activa con `--ball-model`): en los clips de test de SoccerNet su mejor detección por frame acierta el 78% frente al 62% de COCO, pero en el partido completo del Espanyol (YouTube) salta a botas, farolas y árboles del fondo (23% de saltos de >80 px entre frames seguidos frente al 5% de COCO), así que NO es el de por defecto hasta tener coherencia temporal al elegir el balón. Con COCO a 1280 ese partido pasó de balón en el 19% a 50% de los frames de juego y de poseedor en el 34% al 65%. Se reentrena con `scripts/ball_detector/prepare_soccernet_tracking_ball.py` + `train_ball_yolo.py`; números en `output/ball_experiments/CONCLUSIONES.md`. Ese detector también dispara sobre el escudo del marcador y otros gráficos fijos (en el juvenil de YouTube el escudo ganaba al balón real en el 45-80% de los frames), así que `PlayerTracker._resolve_ball` pasa antes por `core.tracking.StaticBallFilter`: una detección clavada en el mismo píxel en el 70% de los últimos 750 frames se descarta (un balón parado 20 s con la cámara quieta también, pero entonces no hay posesión que perder). Los primeros ~15-25 s de cada vídeo no se filtran por falta de historial.
 
 ## Uso — clasificación de equipos (`core/classification.py`, PRTReId + K-Means)
 
@@ -516,8 +516,19 @@ python -m main --mode full-match --source partido.mp4 --output-dir output/x \
     --shot-backend tdeed --ball-actions-trigger tdeed --ball-actions-label combined
 ```
 
-* `--shot-backend tdeed|events`: `tdeed` (por defecto) saca shot/goal de T-DEED; el resto de
-  eventos sigue saliendo de `core/events.py` (V-JEPA2). `events` es el comportamiento anterior.
+* `--shot-backend tdeed|events`: `tdeed` (por defecto) saca shot/goal y throw-in de T-DEED; el
+  resto de eventos sigue saliendo de `core/events.py` (V-JEPA2). `events` es el comportamiento
+  anterior. `--throw-in-min-score` ajusta el umbral del saque de banda como evento (0.5 por
+  defecto; negativo = dejar el throw-in de V-JEPA2, que fuera de la EFL dispara 4-5 veces más de
+  la cuenta: 204 y 165 tramos en dos partidos juveniles frente a 37-38 saques de T-DEED).
+* `--action-min-score`: score mínimo de T-DEED para disparar una acción de balón (0.5 por
+  defecto, elegido en la EFL). Fuera de ese dominio T-DEED puntúa más bajo: en dos partidos
+  juveniles de YouTube 0.5 dejaba 3-5 acciones/min (lo real son 15-20) y perdía sobre todo
+  conducciones; 0.2-0.3 recupera la densidad, a falta de ground truth para fijar la precisión.
+* `scripts/respot_telemetry.py` regenera `telemetry.json` desde las cachés (`.tdeed.*.npz`,
+  `.possession.jsonl`) con otros umbrales, en segundos y sin GPU, para A/B con
+  `scripts/evaluate_pipeline.py`; la etiqueta de las acciones es la de T-DEED (sin R3D-18) y los
+  eventos que T-DEED no cubre se copian del `telemetry.json` anterior.
 * `--ball-actions-trigger tdeed|possession`: cuándo hay una acción de balón. Con `tdeed` (por
   defecto) cada acción detectada por T-DEED; el jugador sale siempre de `core/possession.py`.
 * `--ball-actions-label combined|classifier|spotter`: quién pone la etiqueta (R3D-18 y T-DEED

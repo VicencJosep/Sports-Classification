@@ -79,8 +79,13 @@ STRIDE: int = 2
 BACKGROUND: str = "background"
 
 # Etiquetas de T-DEED -> vocabulario de este proyecto (core/events.py para
-# shot/goal, core/ball_actions.py para el resto).
-EVENT_LABELS: dict[str, str] = {"SHOT": "shot", "GOAL": "goal"}
+# shot/goal/throw-in, core/ball_actions.py para el resto). THROW IN está en los
+# dos mapas a propósito: es a la vez un evento de la línea temporal (sustituye
+# al "throw-in" de V-JEPA2 cuando se pide, ver
+# config.BallSpottingConfig.throw_in_min_score) y una acción de balón
+# atribuida a un jugador. Qué clases se emiten como evento lo decide siempre el
+# ``params`` de spot_events / event_spot_params, no este mapa.
+EVENT_LABELS: dict[str, str] = {"SHOT": "shot", "GOAL": "goal", "THROW IN": "throw-in"}
 BALL_ACTION_LABELS: dict[str, str] = {
     "PASS": "pass", "DRIVE": "drive", "HIGH PASS": "high_pass",
     "HEADER": "header", "THROW IN": "throw_in",
