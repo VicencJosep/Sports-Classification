@@ -110,43 +110,86 @@ class BallActionsConfig:
 
 @dataclass(frozen=True)
 class BallSpottingConfig:
-    """Hiperparámetros de core/ball_spotting.py (T-DEED, detección puntual de
-    acciones de balón). Sustituye a core/events.py para shot/goal y, opcional,
-    al disparador por cambio de posesión de las acciones de balón.
+    """Hiperparámetros de core/ball_spotting.py (T-DEED, detección puntual).
+    T-DEED dispara las acciones de balón y, con ``event_source="tdeed"`` (por
+    defecto desde el 15-oct-2026), pone TODOS los eventos de la línea
+    temporal: tiro, gol y saque de banda con su cabeza de acciones de balón;
+    córner, falta, falta directa/indirecta, tarjeta, saque inicial, penalti,
+    sustitución y fuera de juego con su cabeza de SoccerNet-v2. V-JEPA2
+    (core/events.py) ya no corre: medía AP de tiros 34% y fuera de la EFL
+    disparaba saques de banda 4-5 veces más de la cuenta. ``"mixed"`` es el
+    comportamiento anterior (V-JEPA2 + tiro/gol/saque de T-DEED) y
+    ``"vjepa2"`` el de antes de T-DEED.
 
-    Umbrales medidos (ver el docstring de core/ball_spotting.py):
-    ``shot_min_score=0.3`` -> P 65% / R 84% en 6 partidos SoccerNet-v2 de otras
-    ligas (0.5 -> P 75% / R 73%). ``action_min_score=0.5`` -> F1 90% en
-    ground_truth/ (0.3 -> 84%); elegido sobre ese mismo partido, así que es
-    algo optimista.
+    Umbrales por defecto (= techo de los automáticos):
 
-    Fuera del dominio EFL (medido el 11-oct-2026 en dos partidos juveniles de
-    YouTube) T-DEED dispara en los mismos sitios pero con menos confianza:
-    ``action_min_score=0.5`` deja 5,5 y 3,1 acciones/min (lo esperable son
-    15-20) y pierde sobre todo conducciones; 0.2-0.3 recupera la densidad, a
-    falta de ground truth para fijar la precisión. ``main.py
-    --action-min-score`` lo sobreescribe por ejecución y
-    ``scripts/respot_telemetry.py`` regenera la telemetría desde las cachés
-    para comparar umbrales sin re-inferir.
+    * ``action_min_score=0.5`` -> F1 90% en ground_truth/; en el partido
+      completo de Middlesbrough F1 93% (0.3 -> 88%).
+    * ``shot``/``goal`` 0.3 -> P 65% / R 84% en 6 partidos SoccerNet-v2 de
+      otras ligas (0.5 -> P 75% / R 73%); ``throw-in`` 0.5.
+    * Clases de la cabeza SoccerNet: máximo F1 a ±3 s en 10 partidos del split
+      de ENTRENAMIENTO de SoccerNet-v2 (scripts/tune_tdeed_event_thresholds.py,
+      output/sn_event_tuning/). T-DEED se preentrenó con SoccerNet-v2, así que
+      ahí puntúa alto: son umbrales prudentes.
 
-    ``throw_in_min_score``: umbral del saque de banda como EVENTO de la línea
-    temporal (sustituye al "throw-in" de V-JEPA2, que fuera de la EFL dispara
-    4-5 veces más de la cuenta). A 0.5 salen 37-38 por partido juvenil, el
-    orden de magnitud real; ``None`` desactiva la sustitución y deja el de
-    V-JEPA2. Como acción de balón atribuida a un jugador sigue rigiendo
-    ``action_min_score``.
+    Umbrales automáticos (``auto_thresholds``, ver
+    analytics.engine.calibrate_spot_thresholds): fuera de la EFL T-DEED
+    dispara en los mismos sitios con menos confianza (dos juveniles de YouTube,
+    11-oct-2026: a 0.5 salen 4-5,6 acciones/min y 5-7 tiros por partido). Por
+    partido se elige el umbral de acciones que da el ritmo de los 4 partidos
+    EFL de entrenamiento (15,8 acciones/min de juego), acotado a
+    [``auto_action_floor``, ``action_min_score``]: solo baja, nunca sube.
+    Medido el 15-oct-2026: Middlesbrough completo -> 0.45 (F1 92%, el máximo
+    está en 0.45-0.5); Mallorca 0.27 y Espanyol 0.24; en SoccerTrack (cámara
+    panorámica, anotación más densa) el ritmo pediría 0.73-0.88 y bajaría el
+    F1, de ahí el techo. Los EVENTOS no se escalan (``auto_event_min_factor=1``):
+    en 10 partidos de SoccerNet-v2, donde la cabeza de acciones también puntúa
+    bajo (umbral automático 0.21-0.22), bajar los de tiro y saque con ese
+    factor empeoraba el F1 a ±3 s (tiro 0.66 -> 0.62, saque 0.80 -> 0.71): lo
+    que se apaga fuera de la EFL son pases y conducciones, no los eventos; y
+    la cabeza SoccerNet sale con factor ~1 en los juveniles. El mecanismo
+    sigue ahí por si un dominio nuevo lo pide. ``main.py --thresholds fixed``
+    usa los fijos para todo.
     """
 
     repo_dir: Path = PROJECT_ROOT / "models" / "tdeed" / "T-DEED"
     checkpoints_dir: Path = PROJECT_ROOT / "models" / "tdeed"
     model_name: str = "SoccerNetBall_challenge2"
-    shot_min_score: float = 0.3
-    goal_min_score: float = 0.3
-    throw_in_min_score: float | None = 0.5  # None -> el saque de banda sigue saliendo de V-JEPA2
-    event_nms_s: float = 4.0                # dos tiros/saques a menos de 4 s son el mismo pico
+    event_source: str = "tdeed"             # "tdeed" | "mixed" | "vjepa2"
+    # (evento, umbral, nms_s): evento = clave de core.ball_spotting.EVENT_SOURCES. Los de la cabeza
+    # SoccerNet, al máximo F1 a ±3 s en 10 partidos de entrenamiento de SoccerNet-v2 (F1 entre paréntesis;
+    # a ±10 s sale casi igual, así que no es la tolerancia): output/sn_event_tuning/thresholds.json.
+    event_params: tuple[tuple[str, float, float], ...] = (
+        ("shot", 0.3, 4.0),
+        ("goal", 0.3, 4.0),
+        ("throw-in", 0.5, 4.0),
+        ("corner", 0.25, 2.0),        # F1 0.89
+        ("foul", 0.65, 8.0),          # F1 0.57
+        ("free-kick", 0.4, 8.0),      # F1 0.31
+        ("card", 0.3, 4.0),           # F1 0.17
+        ("kick-off", 0.3, 8.0),       # F1 0.12 (máximo a 0.05: inservible)
+        ("penalty", 0.5, 2.0),        # 3 penaltis en los 10 partidos: sin medida
+        ("substitution", 0.2, 8.0),   # F1 0.23
+        ("offside", 0.2, 2.0),        # F1 0.17
+    )
+    # Eventos que se emiten con event_source="tdeed". Solo los que T-DEED acierta: tiro/gol/saque (medidos
+    # en la EFL) y córner/falta. Tarjeta, saque inicial, sustitución, penalti, fuera de juego y falta
+    # directa/indirecta no pasan de F1 0.35 ni en partidos que T-DEED vio al entrenar: en partidos nuevos
+    # serían sobre todo falsas alarmas. Para emitirlos igualmente, añadirlos aquí.
+    tdeed_event_labels: tuple[str, ...] = ("shot", "goal", "throw-in", "corner", "foul")
+    mixed_event_labels: tuple[str, ...] = ("shot", "goal", "throw-in")  # los de T-DEED con event_source="mixed"
     event_smooth_frames: int = 6            # ~0,5 s (frames muestreados a 12,5 fps)
     action_min_score: float = 0.5
     action_nms_s: float = 0.5               # ~12 frames: acciones seguidas del mismo tipo
+    auto_thresholds: bool = True
+    auto_action_rate_per_min: float = 15.8  # acciones/min de juego, 4 partidos EFL de entrenamiento
+    auto_action_floor: float = 0.2
+    auto_event_min_factor: float = 1.0      # 1 = los eventos no se escalan (ver docstring)
+    # Cabeza SoccerNet: ritmo de anotaciones (todas las clases) por minuto de juego y umbral de "algún
+    # evento" que da ese ritmo, en 10 partidos de entrenamiento de SoccerNet-v2 (tune_tdeed_event_thresholds).
+    # 0 = sin calibrar esa cabeza (factor 1). Medido el 15-oct-2026 (umbral por mitad entre 0.59 y 0.78).
+    auto_sn_rate_per_min: float = 2.5
+    auto_sn_reference_score: float = 0.677
 
 
 @dataclass(frozen=True)

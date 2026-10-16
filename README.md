@@ -513,22 +513,34 @@ python -m core.ball_spotting --source partido.mp4 --classes SHOT GOAL
 
 # En el pipeline (valores por defecto):
 python -m main --mode full-match --source partido.mp4 --output-dir output/x \
-    --shot-backend tdeed --ball-actions-trigger tdeed --ball-actions-label combined
+    --event-source tdeed --thresholds auto --ball-actions-trigger tdeed --ball-actions-label combined
 ```
 
-* `--shot-backend tdeed|events`: `tdeed` (por defecto) saca shot/goal y throw-in de T-DEED; el
-  resto de eventos sigue saliendo de `core/events.py` (V-JEPA2). `events` es el comportamiento
-  anterior. `--throw-in-min-score` ajusta el umbral del saque de banda como evento (0.5 por
-  defecto; negativo = dejar el throw-in de V-JEPA2, que fuera de la EFL dispara 4-5 veces más de
-  la cuenta: 204 y 165 tramos en dos partidos juveniles frente a 37-38 saques de T-DEED).
-* `--action-min-score`: score mínimo de T-DEED para disparar una acción de balón (0.5 por
-  defecto, elegido en la EFL). Fuera de ese dominio T-DEED puntúa más bajo: en dos partidos
-  juveniles de YouTube 0.5 dejaba 3-5 acciones/min (lo real son 15-20) y perdía sobre todo
-  conducciones; 0.2-0.3 recupera la densidad, a falta de ground truth para fijar la precisión.
+* `--event-source tdeed|mixed|vjepa2`: de dónde salen los eventos de la línea temporal. `tdeed`
+  (por defecto desde el 15-oct-2026) los saca de T-DEED y no carga V-JEPA2: tiro, gol y saque de
+  banda de su cabeza de acciones de balón; córner y falta de su cabeza de SoccerNet-v2
+  (`config.BallSpottingConfig.tdeed_event_labels`). Esa cabeza también da tarjeta, saque inicial,
+  sustitución, penalti, fuera de juego y falta directa/indirecta (`core.ball_spotting.EVENT_SOURCES`),
+  pero no pasan de F1 0,35 ni en partidos de SoccerNet-v2 que vio al entrenar, así que no se
+  emiten salvo que se añadan a esa lista. La caché `.tdeed.<modelo>.npz`
+  guarda las dos cabezas; las anteriores al 15-oct-2026 solo tienen la primera y se rehacen solas.
+  `mixed` es el comportamiento anterior (V-JEPA2 + tiro/gol/saque de T-DEED) y `vjepa2`, el de
+  antes de T-DEED.
+* `--thresholds auto|fixed`: `auto` (por defecto) ajusta los umbrales en cada partido
+  (`analytics.engine.calibrate_spot_thresholds`). Fuera de la EFL T-DEED dispara en los mismos
+  sitios con menos confianza (en dos juveniles de YouTube, a 0.5 salían 4-5,6 acciones/min y 5-7
+  tiros por partido): el umbral de acciones se elige para dar el ritmo de los partidos EFL de
+  entrenamiento (15,8 acciones/min de juego), acotado a [0.2, 0.5], así que solo baja. En el partido
+  completo de Middlesbrough sale 0.45 (F1 92%, el máximo); en los juveniles 0.24-0.27. Los eventos
+  mantienen su umbral fijo: escalarlos empeoraba tiros y saques en SoccerNet-v2 (ver
+  `config.BallSpottingConfig`). Los umbrales usados quedan en `telemetry.json` (`spot_thresholds`). `fixed` usa los de `config.BallSpottingConfig`, y
+  `--action-min-score X` fija el de acciones.
 * `scripts/respot_telemetry.py` regenera `telemetry.json` desde las cachés (`.tdeed.*.npz`,
-  `.possession.jsonl`) con otros umbrales, en segundos y sin GPU, para A/B con
-  `scripts/evaluate_pipeline.py`; la etiqueta de las acciones es la de T-DEED (sin R3D-18) y los
-  eventos que T-DEED no cubre se copian del `telemetry.json` anterior.
+  `.possession.jsonl`) con otros umbrales (`--thresholds`, `--action-min-score`,
+  `--event-min-score shot=0.2 ...`), en segundos y sin GPU, para A/B con
+  `scripts/evaluate_pipeline.py`; la etiqueta de las acciones es la de T-DEED (sin R3D-18).
+* `scripts/tune_tdeed_event_thresholds.py` fija los umbrales de los eventos de la cabeza SoccerNet
+  sobre partidos del split de entrenamiento de SoccerNet-v2.
 * `--ball-actions-trigger tdeed|possession`: cuándo hay una acción de balón. Con `tdeed` (por
   defecto) cada acción detectada por T-DEED; el jugador sale siempre de `core/possession.py`.
 * `--ball-actions-label combined|classifier|spotter`: quién pone la etiqueta (R3D-18 y T-DEED

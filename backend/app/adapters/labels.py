@@ -8,7 +8,9 @@ checkpoint nuevo no rompa el contrato.
 
 from __future__ import annotations
 
-KNOWN_EVENT_LABELS = ("card", "corner", "foul", "goal", "kick_off", "penalty", "shot", "substitution", "throw_in")
+KNOWN_EVENT_LABELS = (
+    "card", "corner", "foul", "free_kick", "goal", "kick_off", "offside", "penalty", "shot", "substitution", "throw_in",
+)
 KNOWN_BALL_ACTION_LABELS = ("pass", "drive", "high_pass", "header", "throw_in", "background")
 
 

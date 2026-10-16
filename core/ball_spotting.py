@@ -78,14 +78,29 @@ STRIDE: int = 2
 
 BACKGROUND: str = "background"
 
-# Etiquetas de T-DEED -> vocabulario de este proyecto (core/events.py para
-# shot/goal/throw-in, core/ball_actions.py para el resto). THROW IN está en los
-# dos mapas a propósito: es a la vez un evento de la línea temporal (sustituye
-# al "throw-in" de V-JEPA2 cuando se pide, ver
-# config.BallSpottingConfig.throw_in_min_score) y una acción de balón
-# atribuida a un jugador. Qué clases se emiten como evento lo decide siempre el
-# ``params`` de spot_events / event_spot_params, no este mapa.
-EVENT_LABELS: dict[str, str] = {"SHOT": "shot", "GOAL": "goal", "THROW IN": "throw-in"}
+# Eventos de la línea temporal (vocabulario de core/events.py) -> clases de
+# T-DEED cuya probabilidad se suma para formarlos. El checkpoint tiene dos
+# cabezas: la de acciones de balón (SoccerNet Ball, MAYÚSCULAS) y la de
+# SoccerNet-v2 (17 clases de eventos). Tiro, gol y saque de banda salen de la
+# primera, la única medida limpia (AP de tiros 75,6% en 3 partidos EFL no
+# vistos); el resto, de la segunda, que cubre todo lo que hacía V-JEPA2
+# (tarjeta, córner, falta, saque inicial, penalti, sustitución) y añade falta
+# directa/indirecta y fuera de juego. THROW IN está también en
+# BALL_ACTION_LABELS a propósito: es a la vez evento y acción atribuida a un
+# jugador. Qué eventos se emiten lo decide el ``params`` de spot_events.
+EVENT_SOURCES: dict[str, tuple[str, ...]] = {
+    "shot": ("SHOT",),
+    "goal": ("GOAL",),
+    "throw-in": ("THROW IN",),
+    "corner": ("Corner",),
+    "foul": ("Foul",),
+    "free-kick": ("Direct free-kick", "Indirect free-kick"),
+    "card": ("Yellow card", "Red card", "Yellow->red card"),
+    "kick-off": ("Kick-off",),
+    "penalty": ("Penalty",),
+    "substitution": ("Substitution",),
+    "offside": ("Offside",),
+}
 BALL_ACTION_LABELS: dict[str, str] = {
     "PASS": "pass", "DRIVE": "drive", "HIGH PASS": "high_pass",
     "HEADER": "header", "THROW IN": "throw_in",
@@ -100,12 +115,28 @@ class SpotScores:
     classes: tuple[str, ...]     # nombres de columna, classes[0] == "background"
     stride: int                  # la fila i es el frame i * stride del vídeo
     fps: float
+    # Cabeza de eventos de SoccerNet-v2 (mismas filas). Las cachés anteriores
+    # al 15-oct-2026 no la tienen: ``TDEEDSpotter.ensure_scores`` las rehace.
+    sn_probs: Optional[np.ndarray] = None
+    sn_classes: tuple[str, ...] = ()
 
     def frame_indices(self) -> np.ndarray:
         return np.arange(len(self.probs)) * self.stride
 
-    def curve(self, label: str) -> np.ndarray:
-        return self.probs[:, self.classes.index(label)].astype(np.float32)
+    def duration_s(self) -> float:
+        return len(self.probs) * self.stride / self.fps
+
+    def curve(self, label: str | Sequence[str]) -> np.ndarray:
+        """Probabilidad por fila de una clase de cualquiera de las dos cabezas,
+        o la suma de varias (clases excluyentes de una misma softmax: la suma
+        es la probabilidad del grupo, p.ej. las tres tarjetas)."""
+        if not isinstance(label, str):
+            return np.sum([self.curve(one) for one in label], axis=0)
+        if label in self.classes:
+            return self.probs[:, self.classes.index(label)].astype(np.float32)
+        if self.sn_probs is not None and label in self.sn_classes:
+            return self.sn_probs[:, self.sn_classes.index(label)].astype(np.float32)
+        raise KeyError(f"Clase de T-DEED desconocida o sin cabeza SoccerNet en la caché: {label}")
 
 
 def scores_cache_path(source_video: Path, model_name: str = DEFAULT_MODEL_NAME) -> Path:
@@ -115,23 +146,32 @@ def scores_cache_path(source_video: Path, model_name: str = DEFAULT_MODEL_NAME) 
 
 def read_scores(cache_path: Path | str, fps: Optional[float] = None) -> SpotScores:
     z = np.load(cache_path)
+    has_sn = "probs_sn" in z.files
     return SpotScores(
         probs=z["probs"],
         classes=tuple(str(c) for c in z["classes"]),
         stride=int(z["stride"]),
         fps=float(z["fps"]) if "fps" in z.files else float(fps or 25.0),
+        sn_probs=z["probs_sn"] if has_sn else None,
+        sn_classes=tuple(str(c) for c in z["classes_sn"]) if has_sn else (),
     )
+
+
+def cache_has_event_head(cache_path: Path | str) -> bool:
+    """¿La caché guarda también la cabeza de eventos de SoccerNet-v2?"""
+    with np.load(cache_path) as z:
+        return "probs_sn" in z.files
 
 
 def spot(
     scores: SpotScores,
-    label: str,
+    label: str | Sequence[str],
     min_score: float,
     nms_s: float,
     smooth_frames: int = 1,
 ) -> list[tuple[int, float]]:
-    """Picos de la curva de ``label`` (etiqueta de T-DEED, p.ej. ``"SHOT"``):
-    ``[(frame_idx, score)]`` ordenados por tiempo. ``smooth_frames`` > 1
+    """Picos de la curva de ``label`` (etiqueta de T-DEED, p.ej. ``"SHOT"``, o
+    varias que se suman): ``[(frame_idx, score)]`` ordenados por tiempo. ``smooth_frames`` > 1
     promedia la curva (en filas, es decir, frames muestreados) antes de buscar
     picos: T-DEED reparte la probabilidad de un evento entre 2-3 frames
     vecinos y sin suavizar un mismo tiro puede dar dos máximos."""
@@ -147,19 +187,20 @@ def spot(
 def spot_events(
     scores: SpotScores,
     params: Mapping[str, tuple[float, float]],
-    label_map: Mapping[str, str],
     smooth_frames: int = 1,
 ) -> list[SpottedEvent]:
-    """Eventos puntuales de varias clases, con la etiqueta ya traducida al
-    vocabulario del proyecto. ``params``: ``{etiqueta T-DEED: (min_score,
-    nms_s)}``; solo se emiten las clases presentes en ``label_map``."""
+    """Eventos puntuales de la línea temporal. ``params``: ``{evento del
+    proyecto (clave de EVENT_SOURCES): (min_score, nms_s)}``. Los eventos de
+    la cabeza SoccerNet se saltan (con aviso) si la caché no la tiene."""
     events: list[SpottedEvent] = []
-    for raw, (min_score, nms_s) in params.items():
-        if raw not in label_map:
+    for label, (min_score, nms_s) in params.items():
+        sources = EVENT_SOURCES[label]
+        if scores.sn_probs is None and any(src not in scores.classes for src in sources):
+            logger.warning("La caché de T-DEED no tiene la cabeza SoccerNet: sin eventos '%s'", label)
             continue
         events.extend(
-            SpottedEvent(label=label_map[raw], t_s=frame / scores.fps, score=score)
-            for frame, score in spot(scores, raw, min_score, nms_s, smooth_frames)
+            SpottedEvent(label=label, t_s=frame / scores.fps, score=score)
+            for frame, score in spot(scores, sources, min_score, nms_s, smooth_frames)
         )
     events.sort(key=lambda e: e.t_s)
     return events
@@ -224,6 +265,9 @@ class TDEEDSpotter:
         self.classes: tuple[str, ...] = (BACKGROUND,) + tuple(
             name for name, _ in sorted(classes.items(), key=lambda kv: kv[1])
         )
+        self.sn_classes: tuple[str, ...] = (BACKGROUND,) + tuple(
+            name for name, _ in sorted(pretrain_classes.items(), key=lambda kv: kv[1])
+        )
         self._clip_len: int = cfg["clip_len"]
         self._batch_size: int = cfg["batch_size"]
 
@@ -237,8 +281,11 @@ class TDEEDSpotter:
         source_video = Path(source_video)
         cache_path = Path(cache_path) if cache_path else scores_cache_path(source_video, self.model_name)
         if cache_path.exists():
-            logger.info("Caché de T-DEED encontrada: %s", cache_path.name)
-            return cache_path
+            if cache_has_event_head(cache_path):
+                logger.info("Caché de T-DEED encontrada: %s", cache_path.name)
+                return cache_path
+            logger.info("Caché de T-DEED sin la cabeza de eventos (anterior al 15-oct-2026): se rehace %s",
+                        cache_path.name)
 
         from dataset.frame import ActionSpotInferenceDataset
 
@@ -252,27 +299,61 @@ class TDEEDSpotter:
         )
         loader = DataLoader(dataset, batch_size=self._batch_size, shuffle=False, num_workers=1, pin_memory=True)
         n = dataset._video_len // STRIDE
-        acc = np.zeros((n, len(self.classes)), np.float32)
+        heads = (len(self.classes), len(self.sn_classes))
+        acc = [np.zeros((n, k), np.float32) for k in heads]
         support = np.zeros(n, np.int32)
 
-        logger.info("T-DEED: escaneando %s (%d frames) ...", source_video.name, dataset._video_len)
+        logger.info("T-DEED: escaneando %s (%d frames, dos cabezas) ...", source_video.name, dataset._video_len)
         started = time.perf_counter()
         for frames, starts in loader:
-            _, batch_scores = self._model.predict(frames)
-            for clip_scores, start in zip(batch_scores, starts.tolist()):
-                clip_scores = clip_scores[:, : len(self.classes)]
-                if start < 0:  # relleno inicial del dataset
-                    clip_scores, start = clip_scores[-start:], 0
-                end = min(start + clip_scores.shape[0], n)
-                acc[start:end] += clip_scores[: end - start]
-                support[start:end] += 1
-        probs = acc / np.maximum(support, 1)[:, None]
+            batch_heads = self._predict_heads(frames)
+            for i, start in enumerate(starts.tolist()):
+                lo = -start if start < 0 else 0  # relleno inicial del dataset
+                s0 = max(start, 0)
+                end = min(s0 + batch_heads[0].shape[1] - lo, n)
+                for h in range(2):
+                    acc[h][s0:end] += batch_heads[h][i][lo: lo + end - s0]
+                support[s0:end] += 1
+        div = np.maximum(support, 1)[:, None]
         logger.info("T-DEED: %s escaneado en %.0fs", source_video.name, time.perf_counter() - started)
 
         tmp_path = cache_path.with_name(cache_path.stem + ".tmp.npz")
-        np.savez(tmp_path, probs=probs.astype(np.float16), classes=np.array(self.classes), stride=STRIDE, fps=fps)
+        np.savez(tmp_path, probs=(acc[0] / div).astype(np.float16), classes=np.array(self.classes),
+                 probs_sn=(acc[1] / div).astype(np.float16), classes_sn=np.array(self.sn_classes),
+                 stride=STRIDE, fps=fps)
         tmp_path.rename(cache_path)
         return cache_path
+
+    def _predict_heads(self, frames) -> list[np.ndarray]:
+        """Softmax de cada cabeza y recolocación temporal con el desplazamiento
+        predicho (máximo), como ``model.modules.process_double_head`` del repo
+        pero para las DOS cabezas: ``model.predict`` descarta la de SoccerNet.
+        Para la primera da lo mismo que ``model.predict`` (comprobado en
+        scripts/shot_benchmark/tdeed_scan_heads.py con ``--max-clips``)."""
+        torch = self._torch
+        net = self._model._model
+        seq = frames.to(self._model.device).float()
+        net.eval()
+        with torch.no_grad(), torch.amp.autocast("cuda"):
+            pred, _ = net(seq, inference=True)
+        logits, displ = pred["im_feat"], pred["displ_feat"]
+        if isinstance(logits, list):
+            logits = logits[0]
+        if isinstance(displ, list):
+            displ = displ[0]
+        logits, displ = logits.float(), displ.float()
+        batch, length = logits.shape[:2]
+        d = displ.reshape(batch, length, -1)[:, :, 0].round().long()
+        target = (torch.arange(length, device=d.device)[None] - d).clamp(0, length - 1)
+        out = []
+        k1 = len(self.classes)
+        for sl in (slice(0, k1), slice(k1, k1 + len(self.sn_classes))):
+            p = torch.softmax(logits[:, :, sl], dim=2)
+            agg = torch.zeros_like(p).scatter_reduce(
+                1, target[:, :, None].expand_as(p), p, reduce="amax", include_self=True
+            )
+            out.append(agg.cpu().numpy())
+        return out
 
     def release(self) -> None:
         """Libera la VRAM del modelo (el resto del pipeline la necesita)."""

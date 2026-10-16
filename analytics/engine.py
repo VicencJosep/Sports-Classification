@@ -51,7 +51,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Mapping, Optional
+from typing import TYPE_CHECKING, Iterator, Mapping, Optional, Sequence
 
 import cv2
 import numpy as np
@@ -157,9 +157,10 @@ def spotted_event_spans(
     params: Mapping[str, tuple[float, float]],
     smooth_frames: int,
 ) -> list["EventSpan"]:
-    """Eventos de T-DEED (shot/goal) como ``EventSpan`` de ±1 s en torno al
-    pico. ``params``: ``{etiqueta T-DEED: (min_score, nms_s)}``."""
-    from core.ball_spotting import EVENT_LABELS, spot_events
+    """Eventos de T-DEED como ``EventSpan`` de ±1 s en torno al pico.
+    ``params``: ``{evento (clave de core.ball_spotting.EVENT_SOURCES):
+    (min_score, nms_s)}``."""
+    from core.ball_spotting import spot_events
 
     return [
         EventSpan(
@@ -168,8 +169,117 @@ def spotted_event_spans(
             end_s=e.t_s + SPOT_EVENT_HALF_SPAN_S,
             peak_confidence=e.score, mean_confidence=e.score, n_windows=1,
         )
-        for e in spot_events(scores, params, EVENT_LABELS, smooth_frames)
+        for e in spot_events(scores, params, smooth_frames)
     ]
+
+
+@dataclass(frozen=True)
+class SpotThresholds:
+    """Umbrales de T-DEED con los que se analizó un partido (van a la
+    telemetría para que se sepa qué se usó)."""
+
+    mode: str                         # "auto" | "fixed"
+    action_min_score: float
+    event_min_scores: dict[str, float]
+    domain_factor: float              # cabeza de acciones: action_min_score / el fijo (1 = como en la EFL)
+    active_minutes: int               # minutos con juego (ver active_minutes)
+    rate_threshold: Optional[float]   # umbral que daría el ritmo de referencia, antes de acotarlo
+    sn_domain_factor: float = 1.0     # cabeza SoccerNet (1 = como en SoccerNet-v2)
+
+
+# Picos de acción por minuto (>= 0.1) a partir de los cuales un minuto cuenta
+# como "con juego" para la calibración automática de umbrales.
+ACTIVE_MINUTE_MIN_PEAKS: int = 3
+
+
+def active_minutes(scores: "SpotScores", action_nms_s: float) -> int:
+    """Minutos de vídeo con juego: los de 60 s con al menos
+    ``ACTIVE_MINUTE_MIN_PEAKS`` picos de acción de balón >= 0.1. Deja fuera
+    descanso, previa y pantallas fijas, que no tienen acciones."""
+    peaks = spotted_ball_actions(scores, 0.1, action_nms_s)
+    n_bins = max(1, int(np.ceil(scores.duration_s() / 60)))
+    bins = np.array([int(p.frame_idx / scores.fps // 60) for p in peaks], dtype=int)
+    per_bin = np.bincount(bins, minlength=n_bins) if len(bins) else np.zeros(n_bins, dtype=int)
+    return int((per_bin >= ACTIVE_MINUTE_MIN_PEAKS).sum())
+
+
+def sn_event_peak_scores(scores: "SpotScores", smooth_frames: int, nms_s: float = 2.0) -> np.ndarray:
+    """Puntuaciones de los picos de "algún evento" de la cabeza SoccerNet
+    (1 - fondo), de mayor a menor: la señal densa con la que se calibra esa
+    cabeza (ver calibrate_spot_thresholds)."""
+    from core.spotting import find_peaks
+
+    curve = 1.0 - scores.sn_probs[:, 0].astype(np.float32)
+    if smooth_frames > 1:
+        curve = np.convolve(curve, np.ones(smooth_frames) / smooth_frames, mode="same")
+    times = (scores.frame_indices() / scores.fps).tolist()
+    return np.sort(np.array([s for _, s in find_peaks(times, curve.tolist(), 0.02, nms_s)]))[::-1]
+
+
+def calibrate_spot_thresholds(scores: "SpotScores", spot_cfg, events: Sequence[str]) -> SpotThresholds:
+    """Umbrales automáticos por partido (``config.BallSpottingConfig``).
+
+    1. Minutos con juego (``active_minutes``).
+    2. Cabeza de acciones de balón: umbral de acciones = puntuación del pico
+       k-ésimo, k = ritmo de referencia (acciones/min de juego en la EFL) x
+       minutos con juego, acotado a [auto_action_floor, action_min_score]:
+       corrige que T-DEED puntúe más bajo fuera de su dominio, nunca lo
+       endurece. Su factor de dominio = ese umbral / action_min_score.
+    3. Cabeza SoccerNet, igual con su propia señal densa (picos de "algún
+       evento", ``sn_event_peak_scores``) y su ritmo y umbral de referencia,
+       medidos en partidos de entrenamiento de SoccerNet-v2. Cada cabeza
+       tiene su factor: en una retransmisión de SoccerNet-v2 la de acciones
+       puntúa bajo y la de eventos no.
+    4. Cada evento usa su umbral fijo x el factor de su cabeza, sin bajar de
+       auto_event_min_factor x fijo (por defecto 1: los eventos no se
+       escalan, ver config.BallSpottingConfig).
+
+    No mira ninguna anotación del partido: solo la distribución de sus
+    propias puntuaciones y ritmos medidos en otros partidos."""
+    from core.ball_spotting import EVENT_SOURCES
+
+    fixed_events = {label: th for label, th, _ in spot_cfg.event_params}
+    active = active_minutes(scores, spot_cfg.action_nms_s)
+
+    def kth(ranked: np.ndarray, rate: float) -> Optional[float]:
+        k = int(round(rate * active))
+        if not len(ranked) or k <= 0:
+            return None
+        return float(ranked[min(k, len(ranked)) - 1])
+
+    ranked = np.sort([a.score for a in spotted_ball_actions(scores, 0.05, spot_cfg.action_nms_s)])[::-1]
+    rate_th = kth(ranked, spot_cfg.auto_action_rate_per_min)
+    action = spot_cfg.action_min_score if rate_th is None else float(
+        np.clip(rate_th, spot_cfg.auto_action_floor, spot_cfg.action_min_score)
+    )
+    factor_ball = action / spot_cfg.action_min_score
+
+    factor_sn = 1.0
+    if scores.sn_probs is not None and spot_cfg.auto_sn_reference_score:
+        sn_th = kth(sn_event_peak_scores(scores, spot_cfg.event_smooth_frames), spot_cfg.auto_sn_rate_per_min)
+        if sn_th is not None:
+            factor_sn = float(min(1.0, sn_th / spot_cfg.auto_sn_reference_score))
+
+    def factor_of(label: str) -> float:
+        on_ball_head = all(src in scores.classes for src in EVENT_SOURCES[label])
+        return max(factor_ball if on_ball_head else factor_sn, spot_cfg.auto_event_min_factor)
+
+    event_scores = {label: round(fixed_events[label] * factor_of(label), 4) for label in events}
+    return SpotThresholds(
+        mode="auto", action_min_score=round(action, 4), event_min_scores=event_scores,
+        domain_factor=round(factor_ball, 4), active_minutes=active,
+        rate_threshold=None if rate_th is None else round(rate_th, 4),
+        sn_domain_factor=round(factor_sn, 4),
+    )
+
+
+def fixed_spot_thresholds(spot_cfg, events: Sequence[str]) -> SpotThresholds:
+    fixed_events = {label: th for label, th, _ in spot_cfg.event_params}
+    return SpotThresholds(
+        mode="fixed", action_min_score=spot_cfg.action_min_score,
+        event_min_scores={label: fixed_events[label] for label in events},
+        domain_factor=1.0, active_minutes=0, rate_threshold=None,
+    )
 
 
 def _combine_action_label(
@@ -247,6 +357,7 @@ class FullMatchTelemetry:
     ball_actions: list[PossessionChangeAction]
     n_frames: int
     n_possession_changes: int
+    spot_thresholds: Optional[dict] = None  # SpotThresholds usados (None sin T-DEED)
 
     def to_telemetry(self) -> dict:
         return asdict(self)
@@ -939,6 +1050,7 @@ def analyze_full_match(
     event_spot_params: Optional[Mapping[str, tuple[float, float]]] = None,
     event_spot_smooth_frames: int = 1,
     ball_action_spot_params: Optional[tuple[float, float]] = None,
+    spot_thresholds: Optional[dict] = None,
     ball_action_label_source: str = "classifier",
 ) -> tuple[FullMatchTelemetry, Path, dict[int, Optional[int]]]:
     """Analiza un partido completo (~90 min): Pase A (tracking, cacheado) +
@@ -955,11 +1067,11 @@ def analyze_full_match(
 
     Con ``spot_scores`` (caché de T-DEED, ``core/ball_spotting.py``):
 
-    * ``event_spot_params`` (``{etiqueta T-DEED: (min_score, nms_s)}``): los
-      eventos de esas clases (shot/goal, y throw-in si
-      ``config.BallSpottingConfig.throw_in_min_score`` no es None) salen de
-      T-DEED y los tramos de ``event_classifier`` con esas mismas etiquetas se
-      descartan.
+    * ``event_spot_params`` (``{evento: (min_score, nms_s)}``, eventos de
+      ``core.ball_spotting.EVENT_SOURCES``): esos eventos salen de T-DEED y
+      los tramos de ``event_classifier`` (si lo hay) con esas mismas
+      etiquetas se descartan.
+    * ``spot_thresholds``: los umbrales usados, que se copian a la telemetría.
     * ``ball_action_spot_params`` (``(min_score, nms_s)``): las acciones de
       balón se disparan en los picos de T-DEED en vez de en los cambios de
       posesión (ver ``_analyze_possession_and_ball_actions``).
@@ -1001,10 +1113,8 @@ def analyze_full_match(
         events = _merge_event_windows(window_predictions)
 
     if spot_scores is not None and event_spot_params:
-        from core.ball_spotting import EVENT_LABELS
-
         spans = spotted_event_spans(spot_scores, event_spot_params, event_spot_smooth_frames)
-        replaced = {EVENT_LABELS[raw] for raw in event_spot_params if raw in EVENT_LABELS}
+        replaced = set(event_spot_params)
         events = sorted(
             [e for e in events if e.label not in replaced] + spans, key=lambda e: e.start_s
         )
@@ -1015,6 +1125,7 @@ def analyze_full_match(
         ball_actions=ball_actions,
         n_frames=n_frames,
         n_possession_changes=len(ball_actions),
+        spot_thresholds=spot_thresholds,
     )
     return telemetry, tracks_path, possessor_by_frame
 

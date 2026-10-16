@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -283,50 +284,69 @@ def _run_publish(
 
 def _build_spot_kwargs(args: argparse.Namespace, cfg: config.PipelineConfig) -> dict:
     """Argumentos de T-DEED para ``analyze_full_match`` (vacío si no se usa).
-    Calcula la caché de probabilidades del vídeo si no existe y libera el
-    modelo antes de volver: el resto del pipeline necesita esa VRAM."""
-    use_for_events = args.shot_backend == "tdeed" and not args.skip_events
+    Calcula la caché de probabilidades del vídeo si no existe (o si es
+    anterior a la cabeza de eventos) y libera el modelo antes de volver: el
+    resto del pipeline necesita esa VRAM. Los umbrales son automáticos por
+    partido salvo ``--thresholds fixed`` (ver
+    ``analytics.engine.calibrate_spot_thresholds``)."""
+    spot_cfg = cfg.ball_spotting
+    if args.skip_events or spot_cfg.event_source == "vjepa2":
+        event_labels: tuple[str, ...] = ()
+    elif spot_cfg.event_source == "mixed":
+        event_labels = spot_cfg.mixed_event_labels
+    else:
+        event_labels = spot_cfg.tdeed_event_labels
     use_for_actions = args.ball_actions_trigger == "tdeed" and not args.skip_ball_actions
-    if not (use_for_events or use_for_actions):
+    if not (event_labels or use_for_actions):
         return {}
 
-    from core.ball_spotting import TDEEDSpotter, read_scores, scores_cache_path
+    from analytics.engine import calibrate_spot_thresholds, fixed_spot_thresholds
+    from core.ball_spotting import TDEEDSpotter, cache_has_event_head, read_scores, scores_cache_path
 
-    spot_cfg = cfg.ball_spotting
     cache_path = scores_cache_path(args.source, spot_cfg.model_name)
-    if not cache_path.exists():
+    if not cache_path.exists() or not cache_has_event_head(cache_path):
         spotter = TDEEDSpotter(spot_cfg.model_name, spot_cfg.repo_dir, spot_cfg.checkpoints_dir)
         spotter.ensure_scores(args.source, cache_path)
         spotter.release()
 
-    kwargs: dict = {"spot_scores": read_scores(cache_path)}
-    if use_for_events:
+    scores = read_scores(cache_path)
+    if spot_cfg.auto_thresholds:
+        thresholds = calibrate_spot_thresholds(scores, spot_cfg, event_labels)
+    else:
+        thresholds = fixed_spot_thresholds(spot_cfg, event_labels)
+    logger.info(
+        "Umbrales de T-DEED (%s): acciones %.3f, factor de dominio %.2f, %d min de juego; eventos %s",
+        thresholds.mode, thresholds.action_min_score, thresholds.domain_factor,
+        thresholds.active_minutes, thresholds.event_min_scores,
+    )
+
+    nms_of = {label: nms for label, _, nms in spot_cfg.event_params}
+    kwargs: dict = {"spot_scores": scores, "spot_thresholds": asdict(thresholds)}
+    if event_labels:
         kwargs["event_spot_params"] = {
-            "SHOT": (spot_cfg.shot_min_score, spot_cfg.event_nms_s),
-            "GOAL": (spot_cfg.goal_min_score, spot_cfg.event_nms_s),
+            label: (thresholds.event_min_scores[label], nms_of[label]) for label in event_labels
         }
-        if spot_cfg.throw_in_min_score is not None:
-            # El saque de banda también sale de T-DEED; analyze_full_match
-            # descarta entonces los tramos "throw-in" de V-JEPA2.
-            kwargs["event_spot_params"]["THROW IN"] = (spot_cfg.throw_in_min_score, spot_cfg.event_nms_s)
         kwargs["event_spot_smooth_frames"] = spot_cfg.event_smooth_frames
     if use_for_actions:
-        kwargs["ball_action_spot_params"] = (spot_cfg.action_min_score, spot_cfg.action_nms_s)
+        kwargs["ball_action_spot_params"] = (thresholds.action_min_score, spot_cfg.action_nms_s)
         kwargs["ball_action_label_source"] = args.ball_actions_label
     return kwargs
 
 
 def _apply_spot_overrides(args: argparse.Namespace, cfg: config.PipelineConfig) -> config.PipelineConfig:
-    """``--action-min-score`` / ``--throw-in-min-score`` -> copia de ``cfg`` con
-    esos umbrales de T-DEED (los dataclasses de config son frozen). Un
-    ``--throw-in-min-score`` negativo deja el saque de banda de V-JEPA2."""
+    """``--event-source`` / ``--thresholds`` / ``--action-min-score`` -> copia
+    de ``cfg`` (los dataclasses de config son frozen). Un
+    ``--action-min-score`` explícito fija los umbrales (sin calibración)."""
     from dataclasses import replace
 
     changes: dict = {}
+    if args.event_source is not None:
+        changes["event_source"] = args.event_source
+    if args.thresholds is not None:
+        changes["auto_thresholds"] = args.thresholds == "auto"
     if args.action_min_score is not None:
         changes["action_min_score"] = args.action_min_score
-    if args.throw_in_min_score is not None:
-        changes["throw_in_min_score"] = None if args.throw_in_min_score < 0 else args.throw_in_min_score
+        changes["auto_thresholds"] = False
     if not changes:
         return cfg
     return replace(cfg, ball_spotting=replace(cfg.ball_spotting, **changes))
@@ -339,7 +359,11 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
     output_dir.mkdir(parents=True, exist_ok=True)
 
     ball_action_classifier = _build_ball_action_classifier(cfg, args.device, args.skip_ball_actions)
-    event_classifier = _build_event_classifier(cfg, args.device, args.skip_events)
+    # Con event_source="tdeed" (por defecto) V-JEPA2 no se carga: todos los
+    # eventos salen de T-DEED.
+    event_classifier = _build_event_classifier(
+        cfg, args.device, args.skip_events or cfg.ball_spotting.event_source == "tdeed"
+    )
 
     spot_kwargs = _build_spot_kwargs(args, cfg)
 
@@ -403,11 +427,15 @@ def main() -> None:
     parser.add_argument("--skip-classification", action="store_true", help="No asignar equipos (team_by_tracker_id=None)")
     parser.add_argument("--skip-ball-actions", action="store_true")
     parser.add_argument("--skip-events", action="store_true")
-    parser.add_argument("--shot-backend", choices=["tdeed", "events"], default="tdeed",
-                        help="Solo --mode full-match. Quién detecta shot/goal: 'tdeed' "
-                             "(core/ball_spotting.py, por defecto: AP de tiros 75-78%% frente al "
-                             "~34%% de V-JEPA2; el resto de eventos sigue saliendo de "
-                             "core/events.py) o 'events' (todo de core/events.py, como antes)")
+    parser.add_argument("--event-source", choices=["tdeed", "mixed", "vjepa2"], default=None,
+                        help="Solo --mode full-match. De dónde salen los eventos: 'tdeed' (por "
+                             "defecto, config.BallSpottingConfig.event_source: todos de T-DEED, sin "
+                             "V-JEPA2), 'mixed' (V-JEPA2 + tiro/gol/saque de banda de T-DEED, el "
+                             "comportamiento anterior) o 'vjepa2' (todo de core/events.py)")
+    parser.add_argument("--thresholds", choices=["auto", "fixed"], default=None,
+                        help="Solo --mode full-match. Umbrales de T-DEED: 'auto' (por defecto) los "
+                             "ajusta por partido al ritmo de acciones de la EFL, solo hacia abajo; "
+                             "'fixed' usa los de config.BallSpottingConfig")
     parser.add_argument("--ball-actions-trigger", choices=["tdeed", "possession"], default="tdeed",
                         help="Solo --mode full-match. Cuándo hay una acción de balón: en cada "
                              "acción detectada por T-DEED (por defecto; F1 88%% frente al 38%% del "
@@ -419,13 +447,7 @@ def main() -> None:
                              "('classifier'), T-DEED ('spotter') o los dos ('combined')")
     parser.add_argument("--action-min-score", type=float, default=None,
                         help="Solo --mode full-match: score mínimo de T-DEED para disparar una acción "
-                             "de balón (por defecto config.BallSpottingConfig.action_min_score=0.5, "
-                             "elegido en la EFL; fuera de ese dominio 0.2-0.3 recupera la densidad "
-                             "real de pases y conducciones, ver config.py)")
-    parser.add_argument("--throw-in-min-score", type=float, default=None,
-                        help="Solo --mode full-match: score mínimo de T-DEED para el saque de banda "
-                             "como evento (por defecto config.BallSpottingConfig.throw_in_min_score="
-                             "0.5); un valor negativo deja el throw-in de V-JEPA2, como antes")
+                             "de balón; fija los umbrales (equivale a --thresholds fixed con ese valor)")
     parser.add_argument("--skip-homography", action="store_true",
                         help="No calibrar el campo (sin tracks_2d.jsonl ni radar.mp4)")
     parser.add_argument("--homography-stride", type=int, default=None,
