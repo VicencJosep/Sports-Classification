@@ -1,0 +1,37 @@
+{
+  "_comment": "Goles de referencia para evaluar analytics/highlights (segundos de VÍDEO). Clásico: tiempos leídos del marcador de la retransmisión (±5 s). Mallorca: los dos primeros los dio el usuario; el tercero (1:34:42, marcador 1-1 -> 1-2) lo halló el lector de marcador y se comprobó en el vídeo. tolerance_s: un gol cuenta como cubierto por un candidato si su ancla está a menos de esa distancia o si cae dentro de la jugada.",
+  "tolerance_s": 15.0,
+  "matches": {
+    "clasico": {
+      "name": "Real Madrid 2-3 Barcelona 2016/17 (TV)",
+      "backend_match": "c4f34f24331dcb32",
+      "part": "full",
+      "dir": "backend/storage/outputs/c4f34f24331dcb32/full/highlights",
+      "goals": [
+        {"t_s": 2025.0, "note": "Casemiro 1-0"},
+        {"t_s": 2289.0, "note": "Rakitic 1-1"},
+        {"t_s": 5185.0, "note": "Messi 1-2"},
+        {"t_s": 5958.0, "note": "James 2-2"},
+        {"t_s": 6363.0, "note": "Messi 2-3"}
+      ]
+    },
+    "mallorca": {
+      "name": "RCD Mallorca vs FC Barcelona juvenil (rótulo propio, cámara única)",
+      "backend_match": "433f62c92b727870",
+      "part": "full",
+      "dir": "output/highlights/mallorca",
+      "goals": [
+        {"t_s": 4445.4, "note": "gol del Mallorca"},
+        {"t_s": 4757.5, "note": "gol del Barcelona"},
+        {"t_s": 5682.0, "note": "Barcelona 1-2 (2T 47:00)"}
+      ]
+    },
+    "espanyol": {
+      "name": "Espanyol-Damm (TV con repeticiones)",
+      "backend_match": "f2c9315d3394c6ee",
+      "part": "full",
+      "dir": "output/highlights/espanyol",
+      "goals": []
+    }
+  }
+}

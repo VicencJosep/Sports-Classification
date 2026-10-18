@@ -22,10 +22,12 @@ class AnalysisRun(BaseModel):
     pid: int | None = None
     command: list[str] = Field(default_factory=list)
     pipeline_commit: str | None = None
+    highlights_requested: bool = False  # al terminar, generar las mejores jugadas automáticamente
 
 
 class AnalysisStartRequest(BaseModel):
     mode: AnalysisMode = "full-match"
+    highlights: bool = False            # encadenar la generación de highlights al acabar el análisis
 
 
 class PartAnalysisStatus(BaseModel):

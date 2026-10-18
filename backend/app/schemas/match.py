@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field, field_validator
 
 from .common import AnalysisMode, AnalysisStatus, PartKind
+from .highlights import HighlightsSummary
 from .video import Video
 
 
@@ -15,6 +16,7 @@ class MatchPart(BaseModel):
     stage: str | None = None            # etapa aproximada mientras está en "processing"
     error: str | None = None
     video: Video | None
+    highlights: HighlightsSummary | None = None   # None: nunca se han generado
 
 
 class Match(BaseModel):

@@ -22,11 +22,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.services = build_services(settings)
-        app.state.services.analysis.start_worker()
+        app.state.services.start_workers()
         try:
             yield
         finally:
-            app.state.services.analysis.stop_worker()
+            app.state.services.stop_workers()
 
     app = FastAPI(
         title="Football Intelligence API",

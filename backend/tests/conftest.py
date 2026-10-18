@@ -12,6 +12,7 @@ from app.main import create_app
 
 TESTS_DIR = Path(__file__).resolve().parent
 FAKE_PIPELINE = TESTS_DIR / "fake_pipeline.py"
+FAKE_HIGHLIGHTS = TESTS_DIR / "fake_highlights.py"
 
 
 @pytest.fixture(scope="session")
@@ -33,6 +34,7 @@ def settings(tmp_path: Path) -> Settings:
     return Settings(
         storage_dir=tmp_path / "storage",
         pipeline_command=f"{sys.executable} {FAKE_PIPELINE}",
+        highlights_command=f"{sys.executable} {FAKE_HIGHLIGHTS}",
         project_root=tmp_path,
         max_upload_bytes=50 * 1024 * 1024,
         tracking_max_window_s=10.0,

@@ -12,7 +12,9 @@ import logging
 import queue
 import subprocess
 import threading
+from contextlib import nullcontext
 from pathlib import Path
+from typing import Callable
 
 from app.core.config import Settings
 from app.core.errors import ConflictError, NotFoundError
@@ -42,7 +44,7 @@ def derive_status(statuses: list[str]) -> str:
 class AnalysisService:
     def __init__(
         self, settings: Settings, matches: MatchRepository, videos: VideoRepository, runs: RunStore,
-        launcher: PipelineLauncher, memory: FootballMemory,
+        launcher: PipelineLauncher, memory: FootballMemory, gpu_lock: threading.Lock | None = None,
     ) -> None:
         self.settings = settings
         self.matches = matches
@@ -50,6 +52,11 @@ class AnalysisService:
         self.runs = runs
         self.launcher = launcher
         self.memory = memory
+        # Compartido con HighlightsService: el pipeline y el VLM no caben a la vez en la GPU.
+        self.gpu_lock = gpu_lock
+        # Llamado (en el hilo trabajador) cuando un análisis termina bien con
+        # ``highlights_requested``; lo pone deps.build_services.
+        self.on_completed: Callable[[AnalysisRun], None] | None = None
         self._queue: queue.Queue[tuple[str, str] | None] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._current: subprocess.Popen | None = None
@@ -83,7 +90,10 @@ class AnalysisService:
 
     # --- API -------------------------------------------------------------- #
 
-    def start(self, match: MatchRecord, mode: AnalysisMode) -> AnalysisStatusResponse:
+    def start(self, match: MatchRecord, mode: AnalysisMode, highlights: bool = False) -> AnalysisStatusResponse:
+        """Encola el análisis de las partes que no estén ya completadas.
+        Devuelve también las partes ya completadas (la ruta encadena los
+        highlights de esas directamente, porque aquí no se vuelven a ejecutar)."""
         current = [self.runs.get(match.id, p.id) for p in match.parts]
         if any(r is not None and r.status in ("processing", "pending") for r in current):
             raise ConflictError(f"match {match.id} already has an analysis in progress")
@@ -95,9 +105,13 @@ class AnalysisService:
                 raise NotFoundError(f"video {part.video_id} of part {part.id} does not exist")
             self.runs.save(AnalysisRun(
                 match_id=match.id, part_id=part.id, video_id=part.video_id, mode=mode, created_at=utcnow_iso(),
+                highlights_requested=highlights,
             ))
             self._queue.put((match.id, part.id))
         return self.status(match)
+
+    def completed_parts(self, match: MatchRecord) -> list[str]:
+        return [p.id for p in match.parts if (r := self.runs.get(match.id, p.id)) is not None and r.status == "completed"]
 
     def status(self, match: MatchRecord) -> AnalysisStatusResponse:
         parts = []
@@ -166,7 +180,8 @@ class AnalysisService:
             self.runs.save(run)
 
         try:
-            exit_code = self.launcher.run(command, log_path, _on_start)
+            with (self.gpu_lock or nullcontext()):
+                exit_code = self.launcher.run(command, log_path, _on_start)
         except OSError as exc:
             self._finish(run, error=f"could not start the pipeline: {exc}")
             return
@@ -192,6 +207,11 @@ class AnalysisService:
         run.error, run.stage, run.pid, run.finished_at = error, None, None, utcnow_iso()
         self.runs.save(run)
         logger.info("analysis %s/%s finished: %s", run.match_id, run.part_id, run.status)
+        if error is None and run.highlights_requested and self.on_completed is not None:
+            try:
+                self.on_completed(run)
+            except Exception:  # noqa: BLE001 - los highlights no deben tumbar el análisis ya completado
+                logger.exception("could not chain highlights for %s/%s", run.match_id, run.part_id)
 
 
 def _log_tail(log_path: Path) -> str:
