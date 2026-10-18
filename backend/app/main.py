@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 
 from app.api.deps import build_services
 from app.api.routes import health, matches, videos
@@ -44,6 +45,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
         expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
     )
+    # Las respuestas JSON grandes (una ventana de tracking de 30 s son 2,4 MB) van comprimidas: con el frontend
+    # abierto por un túnel SSH el tracking era la mitad del tráfico. Starlette ya excluye video/* e imágenes.
+    app.add_middleware(GZipMiddleware, minimum_size=1024)
     install_error_handlers(app)
 
     api = APIRouter(prefix="/api")
