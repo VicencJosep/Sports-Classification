@@ -17,7 +17,10 @@ basketball/inputs
 basketball/outputs
 basketball/models
 
-ground_truth/
+# ground_truth/: los JSON de verdad (*.gt.json, highlights_goals.json) van a git; vídeos y cachés no.
+ground_truth/*
+!ground_truth/*.gt.json
+!ground_truth/highlights_goals.json
 
 # PnLCalib: repo de terceros clonado tal cual (calibración de campo). A
 # diferencia de Soccer_Master no hemos modificado nada dentro, así que se

@@ -55,6 +55,7 @@ class MatchEvent(BaseModel):
     peak_confidence: float
     mean_confidence: float
     n_windows: int
+    estimated: bool = False     # clase sin verdad medida (p.ej. foul): la UI la enseña como "estimado"
 
 
 class BallAction(BaseModel):

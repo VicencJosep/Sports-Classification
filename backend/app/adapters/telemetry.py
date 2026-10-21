@@ -40,6 +40,7 @@ def to_events(raw: dict, duration_s: float) -> list[MatchEvent]:
                     peak_confidence=float(e["peak_confidence"]),
                     mean_confidence=float(e["mean_confidence"]),
                     n_windows=int(e["n_windows"]),
+                    estimated=bool(e.get("estimated", False)),
                 )
                 for i, e in enumerate(spans)
             ]

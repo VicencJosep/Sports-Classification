@@ -51,7 +51,7 @@ import json
 import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Collection, Iterator, Mapping, Optional, Sequence
 
 import cv2
 import numpy as np
@@ -156,10 +156,12 @@ def spotted_event_spans(
     scores: "SpotScores",
     params: Mapping[str, tuple[float, float]],
     smooth_frames: int,
+    estimated: Collection[str] = (),
 ) -> list["EventSpan"]:
     """Eventos de T-DEED como ``EventSpan`` de ±1 s en torno al pico.
     ``params``: ``{evento (clave de core.ball_spotting.EVENT_SOURCES):
-    (min_score, nms_s)}``."""
+    (min_score, nms_s)}``; los de ``estimated`` (sin verdad medida, ver
+    ``config.BallSpottingConfig.tdeed_estimated_event_labels``) salen marcados."""
     from core.ball_spotting import spot_events
 
     return [
@@ -168,6 +170,7 @@ def spotted_event_spans(
             start_s=max(0.0, e.t_s - SPOT_EVENT_HALF_SPAN_S),
             end_s=e.t_s + SPOT_EVENT_HALF_SPAN_S,
             peak_confidence=e.score, mean_confidence=e.score, n_windows=1,
+            estimated=e.label in estimated,
         )
         for e in spot_events(scores, params, smooth_frames)
     ]
@@ -337,6 +340,7 @@ class EventSpan:
     peak_confidence: float
     mean_confidence: float
     n_windows: int
+    estimated: bool = False            # clase emitida sin verdad medida (p.ej. falta): la UI lo enseña como estimación
 
     def to_telemetry(self) -> dict:
         return asdict(self)
@@ -1049,6 +1053,7 @@ def analyze_full_match(
     spot_scores: Optional["SpotScores"] = None,
     event_spot_params: Optional[Mapping[str, tuple[float, float]]] = None,
     event_spot_smooth_frames: int = 1,
+    event_spot_estimated: Collection[str] = (),
     ball_action_spot_params: Optional[tuple[float, float]] = None,
     spot_thresholds: Optional[dict] = None,
     ball_action_label_source: str = "classifier",
@@ -1113,7 +1118,7 @@ def analyze_full_match(
         events = _merge_event_windows(window_predictions)
 
     if spot_scores is not None and event_spot_params:
-        spans = spotted_event_spans(spot_scores, event_spot_params, event_spot_smooth_frames)
+        spans = spotted_event_spans(spot_scores, event_spot_params, event_spot_smooth_frames, event_spot_estimated)
         replaced = set(event_spot_params)
         events = sorted(
             [e for e in events if e.label not in replaced] + spans, key=lambda e: e.start_s

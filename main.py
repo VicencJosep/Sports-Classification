@@ -327,6 +327,7 @@ def _build_spot_kwargs(args: argparse.Namespace, cfg: config.PipelineConfig) -> 
             label: (thresholds.event_min_scores[label], nms_of[label]) for label in event_labels
         }
         kwargs["event_spot_smooth_frames"] = spot_cfg.event_smooth_frames
+        kwargs["event_spot_estimated"] = spot_cfg.tdeed_estimated_event_labels
     if use_for_actions:
         kwargs["ball_action_spot_params"] = (thresholds.action_min_score, spot_cfg.action_nms_s)
         kwargs["ball_action_label_source"] = args.ball_actions_label

@@ -178,6 +178,12 @@ class BallSpottingConfig:
     # serían sobre todo falsas alarmas. Para emitirlos igualmente, añadirlos aquí.
     tdeed_event_labels: tuple[str, ...] = ("shot", "goal", "throw-in", "corner", "foul")
     mixed_event_labels: tuple[str, ...] = ("shot", "goal", "throw-in")  # los de T-DEED con event_source="mixed"
+    # Eventos que se emiten pero SIN verdad medida en nuestros partidos: van marcados ``estimated`` en la
+    # telemetría y en la API para que la interfaz los enseñe como estimación. Falta: P 0/3 en los 20 min de
+    # Middlesbrough (2 faltas reales), 17/32 en el Clásico (preliminar, partido que T-DEED vio al entrenar).
+    # Córner (F1 0,89 en SoccerNet-v2, también in-sample) se mide primero en el juvenil anotado. Para dejar de
+    # emitir una clase, quitarla de tdeed_event_labels.
+    tdeed_estimated_event_labels: tuple[str, ...] = ("foul",)
     event_smooth_frames: int = 6            # ~0,5 s (frames muestreados a 12,5 fps)
     action_min_score: float = 0.5
     action_nms_s: float = 0.5               # ~12 frames: acciones seguidas del mismo tipo
@@ -398,6 +404,7 @@ class HighlightsConfig:
     scoreboard_step_s: float = 30.0         # una lectura cada tanto; el cambio se localiza luego por bisección
     scoreboard_min_valid: float = 0.25      # fracción de lecturas legibles para fiarse de que hay rótulo
     scoreboard_goal_before_s: float = 45.0  # el gol (ancla) cae hasta tanto antes de que el rótulo cambie
+    scoreboard_goal_near_s: float = 20.0    # ...pero normalmente dentro de este margen: si hay candidatos ahí, es uno de ellos
     w_scoreboard: float = 5.0               # bonus de reglas al candidato del gol confirmado
 
     # V-JEPA2 + SVC como segundo juez de gol (sin marcador): ventanas de 6 s
@@ -427,6 +434,18 @@ class HighlightsConfig:
     w_final_rules: float = 0.4
     w_final_vlm: float = 0.6
     merge_gap_s: float = 20.0               # jugadas casi seguidas (parada -> córner -> gol) en un clip
+
+    # Duración de los clips (hoja de ruta §3.4): 12-30 s; los goles son la excepción (hasta 45 s para que
+    # quepa la celebración, contados desde el gol y no desde el ancla, que en cámara única puede ir 20-30 s
+    # antes). Se aplica en pipeline.fit_duration tras fijar los límites con el VLM: primero se recorta lo
+    # anterior al momento clave (clip_back_max_s) y luego la cola; lo más corto de clip_min_s se alarga.
+    clip_min_s: float = 12.0
+    clip_max_s: float = 30.0
+    clip_max_goal_s: float = 45.0
+    clip_back_max_s: float = 12.0           # como mucho tanto antes del momento clave (jugada sin gol)
+    clip_back_max_goal_s: float = 15.0      # ...y en un gol
+    end_replay_max_s: float = 8.0           # las repeticiones de TV (solo cuentan tras un gol) alargan como mucho esto
+    clip_max_merged_s: float = 40.0         # dos jugadas seguidas solo se funden si el clip no pasa de esto
 
     # Corte
     ffmpeg_crf: int = 20

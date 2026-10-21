@@ -109,7 +109,7 @@ def main() -> None:
 
     nms_of = {label: nms for label, _, nms in spot_cfg.event_params}
     event_params = {label: (thresholds.event_min_scores[label], nms_of[label]) for label in labels}
-    spans = spotted_event_spans(scores, event_params, spot_cfg.event_smooth_frames)
+    spans = spotted_event_spans(scores, event_params, spot_cfg.event_smooth_frames, spot_cfg.tdeed_estimated_event_labels)
     replaced = set(event_params)
 
     kept: list[EventSpan] = []
