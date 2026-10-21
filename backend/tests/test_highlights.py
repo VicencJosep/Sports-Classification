@@ -29,8 +29,12 @@ def test_highlights_chained_to_analysis(client, sample_video):
     result = wait_for_highlights(client, mid)
     assert result["status"] == "completed", result
     assert result["vlm_model"] == "fake-vlm" and result["n_candidates"] == 7
+    # Origen y estado degradado, tal cual los deja highlights.json (la UI los enseña).
+    assert result["vlm_used"] is True and result["vlm_degraded"] is True and result["vjepa_used"] is False
+    assert result["scoreboard_available"] is True and result["n_scoreboard_changes"] == 1
     clip = result["clips"][0]
     assert clip["id"] == "hl-01" and clip["label"] == "goal" and clip["team_cluster"] == 1
+    assert clip["goal_source"] == "restart"
     assert clip["content_url"] == f"/api/matches/{mid}/parts/full/highlights/hl-01/content"
 
     summary = client.get(f"/api/matches/{mid}").json()["parts"][0]["highlights"]

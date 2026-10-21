@@ -33,8 +33,10 @@ def main() -> int:
     report = {
         "video": str(args.storage_dir / "videos" / "x" / "source.mp4"),
         "generated_at": "2026-10-16T12:00:00Z",
-        "vlm": {"used": True, "model": "fake-vlm"},
+        "vlm": {"used": True, "model": "fake-vlm", "api": "ollama", "degraded": True, "n_failed_calls": 1},
         "has_audio": True,
+        "scoreboard": {"available": True, "n_samples": 10, "n_valid": 9, "changes": [{"t_lo": 0.5, "t_hi": 1.5, "before": [0, 0], "after": [1, 0]}]},
+        "vjepa": {"used": False},
         "n_candidates": 7,
         "highlights": [{
             "id": "hl-01", "rank": 1, "clip": "clip_01.mp4", "start_s": 0.0, "end_s": 1.5, "anchor_s": 1.0,

@@ -1,5 +1,5 @@
 {
-  "_comment": "Goles de referencia para evaluar analytics/highlights (segundos de VÍDEO). Clásico: tiempos leídos del marcador de la retransmisión (±5 s). Mallorca: los dos primeros los dio el usuario; el tercero (1:34:42, marcador 1-1 -> 1-2) lo halló el lector de marcador y se comprobó en el vídeo. tolerance_s: un gol cuenta como cubierto por un candidato si su ancla está a menos de esa distancia o si cae dentro de la jugada.",
+  "_comment": "Goles de referencia para evaluar analytics/highlights (segundos de VÍDEO). Clásico: tiempos leídos del marcador de la retransmisión (±5 s). Mallorca: los dos primeros los dio el usuario; el tercero (1:34:42, marcador 1-1 -> 1-2) lo halló el lector de marcador y se comprobó en el vídeo. tolerance_s: un gol cuenta como cubierto por un candidato si su ancla está a menos de esa distancia o si cae dentro de la jugada. dir: la salida que ve el frontend (backend/storage/outputs/<match>/<part>/highlights). ref_clips: cortes de referencia dados por el usuario (inicio/fin en segundos de vídeo) para medir la política de duración.",
   "tolerance_s": 15.0,
   "matches": {
     "clasico": {
@@ -13,13 +13,16 @@
         {"t_s": 5185.0, "note": "Messi 1-2"},
         {"t_s": 5958.0, "note": "James 2-2"},
         {"t_s": 6363.0, "note": "Messi 2-3"}
+      ],
+      "ref_clips": [
+        {"t_s": 6363.0, "start_s": 6356.0, "end_s": 6406.0, "note": "Messi 2-3 (usuario, 1:45:56-1:46:46: 7 s de jugada + celebración)"}
       ]
     },
     "mallorca": {
       "name": "RCD Mallorca vs FC Barcelona juvenil (rótulo propio, cámara única)",
       "backend_match": "433f62c92b727870",
       "part": "full",
-      "dir": "output/highlights/mallorca",
+      "dir": "backend/storage/outputs/433f62c92b727870/full/highlights",
       "goals": [
         {"t_s": 4445.4, "note": "gol del Mallorca"},
         {"t_s": 4757.5, "note": "gol del Barcelona"},
@@ -30,7 +33,14 @@
       "name": "Espanyol-Damm (TV con repeticiones)",
       "backend_match": "f2c9315d3394c6ee",
       "part": "full",
-      "dir": "output/highlights/espanyol",
+      "dir": "backend/storage/outputs/f2c9315d3394c6ee/full/highlights",
+      "goals": []
+    },
+    "middlesbrough": {
+      "name": "Middlesbrough-Preston 20 min (TV sin rótulo; sin goles)",
+      "backend_match": "6565edb583a4a434",
+      "part": "full",
+      "dir": "backend/storage/outputs/6565edb583a4a434/full/highlights",
       "goals": []
     }
   }

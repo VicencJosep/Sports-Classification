@@ -49,6 +49,8 @@ class HighlightClip(BaseModel):
     team_cluster: int | None
     final_score: float
     vlm_rank: int | None = None
+    goal_source: str | None = None      # por qué es gol: scoreboard | restart | vlm+restart | fusion | celebration+audio;
+                                        # "fusion" y "celebration+audio" son goles PROBABLES (título "Gol probable")
     content_url: str | None             # None si el clip no se recortó
 
 
@@ -62,5 +64,10 @@ class HighlightsResponse(BaseModel):
     finished_at: str | None = None
     generated_at: str | None = None
     vlm_model: str | None = None
+    vlm_used: bool = False              # False: el VLM no estaba disponible y la selección es solo por reglas
+    vlm_degraded: bool = False          # True: alguna llamada al VLM falló a mitad (jugadas sin veredicto)
+    vjepa_used: bool = False
+    scoreboard_available: bool | None = None   # None: no se intentó leer el rótulo
+    n_scoreboard_changes: int = 0
     n_candidates: int = 0
     clips: list[HighlightClip] = Field(default_factory=list)

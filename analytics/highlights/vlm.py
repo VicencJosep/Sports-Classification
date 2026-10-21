@@ -183,6 +183,21 @@ class VLMClient:
             return False
 
 
+class CacheOnlyClient(VLMClient):
+    """Cliente que no pregunta nada: sirve para regenerar highlights con los veredictos ya cacheados
+    (``vlm_cache.json``, ``scoreboard.json``) sin modelo ni GPU, p.ej. al medir un cambio de la política de corte.
+    Lo que no esté en caché falla como fallaría un VLM caído y el pipeline sigue sin ese veredicto."""
+
+    def __init__(self, model: str = "qwen3.5:9b-q8_0") -> None:
+        super().__init__(model=model, api="cache", retries=0)
+
+    def chat(self, prompt: str, images: Sequence[bytes], max_tokens: int = 700) -> str:
+        raise RuntimeError("VLM en modo solo caché: veredicto no cacheado")
+
+    def ping(self) -> bool:
+        return True
+
+
 # --------------------------------------------------------------------------- #
 #  Preguntas
 # --------------------------------------------------------------------------- #
@@ -221,8 +236,11 @@ Classify EVERY frame with one of these kinds:
 Answer with compact JSON only, one pair [timestamp, kind] per frame, in order:
 {{"frames": [["<timestamp label>", "<kind>"], ...], "notes": "<a few words>"}}"""
 
-# Frames de estos tipos son la reacción al momento clave: el clip acaba tras el último de ellos.
-_END_REACTION_KINDS: frozenset[str] = frozenset({"celebration", "crowd", "replay"})
+# Frames de estos tipos son la reacción al momento clave: el clip acaba tras el último de ellos. Las
+# repeticiones ("replay") solo cuentan tras un gol (clip_end_from_kinds): la realización de TV también las
+# encadena tras una parada y alargaban clips de ocasión hasta el tope.
+_END_REACTION_KINDS: frozenset[str] = frozenset({"celebration", "crowd"})
+_REPLAY_KIND = "replay"
 
 _RANK_PROMPT = """You are the editor of the highlights reel of one football (soccer) match.
 Below are candidate plays found automatically. Each has a short description from a visual check and some measurements: shot_prob and goal_prob (0-1, from a video event detector), crowd (crowd/commentary loudness jump in dB right after the moment), passes and carry_m (metres one player carried the ball) in the build-up, and "after": what the detector saw next. The visual check sometimes confuses a goal with a save; "after" is more reliable: a kick-off from the centre spot means a goal was scored, a corner or throw-in means it was not.
@@ -289,32 +307,60 @@ def refine_end(client: VLMClient, video: Path, anchor_s: float, max_post_s: floa
     kinds.sort()
     out["kinds"] = kinds
     out["clip_end_s"] = clip_end_from_kinds(kinds, anchor_s, step_s, max_post_s, default_post_s)
-    out["celebration_seen"] = any(k in ("celebration", "crowd") for _, k in kinds)
-    out["replay_seen"] = any(k == "replay" for _, k in kinds)
+    out["celebration_seen"] = any(k in _END_REACTION_KINDS for _, k in kinds)
+    out["replay_seen"] = any(k == _REPLAY_KIND for _, k in kinds)
     return out
+
+
+def _last_reaction(kinds: list[tuple[float, str]], reaction: frozenset[str],
+                   transparent: frozenset[str] = frozenset()) -> Optional[float]:
+    """Último frame de reacción, admitiendo un frame suelto de otro tipo en medio; los de tipo
+    ``transparent`` ni alargan ni cortan la racha (repeticiones entre dos tramos de celebración)."""
+    reaction_end = None
+    gap = 0
+    for t, kind in kinds:
+        if kind in reaction:
+            reaction_end, gap = t, 0
+        elif kind in transparent:
+            continue
+        elif reaction_end is not None:
+            gap += 1
+            if gap >= 2:
+                break
+    return reaction_end
+
+
+def first_celebration(kinds: list[tuple[float, str]]) -> Optional[float]:
+    """Primer frame de celebración o grada: en un gol, el gol real está justo antes (el ancla de T-DEED o del
+    audio puede ir 20-30 s por delante en cámara única)."""
+    return next((t for t, kind in kinds if kind in _END_REACTION_KINDS), None)
 
 
 def clip_end_from_kinds(
     kinds: list[tuple[float, str]], anchor_s: float, step_s: float, max_post_s: float, default_post_s: float,
+    replay_as_reaction: bool = True, replay_tail_max_s: Optional[float] = None,
 ) -> Optional[float]:
     """Fin del clip a partir de la clasificación por frame:
 
-    - con reacción (celebración, grada, repetición): tras el último frame de
-      reacción, admitiendo un frame suelto de otro tipo en medio;
+    - con reacción (celebración, grada; repetición solo si ``replay_as_reaction``, es decir, tras un gol): tras
+      el último frame de reacción, admitiendo un frame suelto de otro tipo en medio. Las repeticiones que van
+      después de la última celebración alargan como mucho ``replay_tail_max_s``;
     - sin reacción pero con la jugada aún viva al principio (rechace, segundo
       remate): tras ese tramo inicial de acción, con tope corto;
     - si no, ``None`` (se queda el fin provisional de las reglas)."""
     if not kinds:
         return None
-    reaction_end = None
-    gap = 0
-    for t, kind in kinds:
-        if kind in _END_REACTION_KINDS:
-            reaction_end, gap = t, 0
-        elif reaction_end is not None:
-            gap += 1
-            if gap >= 2:
-                break
+    if replay_as_reaction:
+        # Tras un gol las repeticiones no cortan la celebración (van entre dos tramos de celebración) y, si
+        # cierran el clip, lo alargan como mucho replay_tail_max_s tras la última celebración.
+        real_end = _last_reaction(kinds, _END_REACTION_KINDS, transparent=frozenset({_REPLAY_KIND}))
+        with_replay = _last_reaction(kinds, _END_REACTION_KINDS | {_REPLAY_KIND})
+        if with_replay is not None and replay_tail_max_s is not None:
+            cap = (real_end if real_end is not None else anchor_s + default_post_s - step_s) + replay_tail_max_s
+            with_replay = min(with_replay, cap)
+        reaction_end = max(with_replay, real_end) if real_end is not None else with_replay
+    else:
+        reaction_end = _last_reaction(kinds, _END_REACTION_KINDS)
     if reaction_end is not None:
         return min(reaction_end + step_s, anchor_s + max_post_s)
     leading = 0

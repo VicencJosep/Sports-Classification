@@ -128,7 +128,15 @@ class HighlightsService:
         if not report:
             raise NotReadyError(f"highlights of {match_id}/{part_id} finished without a report")
         resp.generated_at = report.get("generated_at")
-        resp.vlm_model = (report.get("vlm") or {}).get("model")
+        vlm = report.get("vlm") or {}
+        resp.vlm_model = vlm.get("model")
+        resp.vlm_used = bool(vlm.get("used", False))
+        resp.vlm_degraded = bool(vlm.get("degraded", False))
+        resp.vjepa_used = bool((report.get("vjepa") or {}).get("used", False))
+        scoreboard = report.get("scoreboard")
+        if scoreboard is not None:
+            resp.scoreboard_available = bool(scoreboard.get("available", False))
+            resp.n_scoreboard_changes = len(scoreboard.get("changes") or [])
         resp.n_candidates = int(report.get("n_candidates", 0))
         base = f"{self.settings.public_base_url}/api/matches/{match_id}/parts/{part_id}/{HIGHLIGHTS_DIRNAME}"
         for h in report.get("highlights", []):
@@ -137,7 +145,7 @@ class HighlightsService:
                 description=h.get("description", ""), start_s=h["start_s"], end_s=h["end_s"],
                 duration_s=h["duration_s"], anchor_s=h["anchor_s"],
                 team_cluster=h.get("team") if h.get("team", -1) >= 0 else None,
-                final_score=h.get("final_score", 0.0), vlm_rank=h.get("vlm_rank"),
+                final_score=h.get("final_score", 0.0), vlm_rank=h.get("vlm_rank"), goal_source=h.get("goal_source"),
                 content_url=f"{base}/{h['id']}/content" if h.get("clip") else None,
             ))
         return resp

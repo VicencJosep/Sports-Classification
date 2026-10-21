@@ -25,7 +25,17 @@ from .cut import cut_clip
 from .scoreboard import ScoreTimeline, build_timeline
 from .signals import MatchSignals, build_signals
 from .vjepa import VJ_FEATURES, VJEPAWindows, apply_vjepa, goal_fusion
-from .vlm import PROMPT_VERSION, VLMClient, hms, judge_candidate, rank_candidates, refine_end
+from .vlm import (
+    PROMPT_VERSION,
+    CacheOnlyClient,
+    VLMClient,
+    clip_end_from_kinds,
+    first_celebration,
+    hms,
+    judge_candidate,
+    rank_candidates,
+    refine_end,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +241,27 @@ def _title(label: str, judge: dict, anchor_s: float, score: Optional[dict] = Non
 #  Marcador de la retransmisión
 # --------------------------------------------------------------------------- #
 
+SCOREBOARD_LAG_S = 4.0              # el rótulo cambia unos segundos después del gol
+GOAL_REANCHOR_MIN_SHIFT_S = 10.0    # el gol se re-ancla solo si el ancla va claramente por delante
+
+
+def goal_time(anchor_s: float, score: Optional[dict], kinds: list, cfg: HighlightsConfig) -> Optional[float]:
+    """Instante del gol cuando el ancla (tiro de T-DEED, griterío) va claramente por delante de él, para contar
+    desde ahí el tope de duración: por el cambio de marcador (fiable; ``t_hi`` − retraso del rótulo) o, sin
+    rótulo, por el primer frame de celebración. En TV las repeticiones pueden ir ANTES de la celebración (el
+    1-1 del Clásico: 7 frames de repetición y la celebración a +30 s), por eso con rótulo manda el rótulo y sin
+    él solo cuenta un desplazamiento claro. ``None`` = el ancla ya es el gol."""
+    if score is not None and score.get("t_hi") is not None:
+        t = float(score["t_hi"]) - SCOREBOARD_LAG_S
+        return t if t - anchor_s >= GOAL_REANCHOR_MIN_SHIFT_S else None
+    t_c = first_celebration(kinds)
+    if t_c is not None:
+        t = t_c - cfg.vlm_end_step_s
+        if GOAL_REANCHOR_MIN_SHIFT_S <= t - anchor_s <= cfg.post_max_s:
+            return t
+    return None
+
+
 def apply_scoreboard(sig: MatchSignals, cands: list[Candidate], timeline: ScoreTimeline, cfg: HighlightsConfig) -> dict[str, dict]:
     """Cada cambio de marcador es un gol: se asigna al candidato de la
     ventana con más tiro/gol (o se crea uno si ningún detector lo vio) y se le
@@ -245,14 +276,20 @@ def apply_scoreboard(sig: MatchSignals, cands: list[Candidate], timeline: ScoreT
     for k, ch in enumerate(timeline.changes):
         pool = [c for c in cands if ch.t_lo - cfg.scoreboard_goal_before_s <= c.anchor_s <= ch.t_hi + 3.0
                 and c.id not in goal_ids]
+        # El rótulo cambia pocos segundos después del gol: si hay candidatos en ese margen corto, el gol es
+        # uno de ellos aunque T-DEED puntúe más alto un tiro anterior (Mallorca 1-0: el tiro 27 s antes del
+        # gol ganaba por SHOT 0,35 frente a 0,14 y el clip se quedaba sin celebración).
+        near = [c for c in pool if c.anchor_s >= ch.t_hi - cfg.scoreboard_goal_near_s]
+        if near:
+            pool = near
         if pool:
             c = max(pool, key=lambda c: (c.features.get("shot", 0.0) + c.features.get("goal", 0.0),
-                                         -abs(c.anchor_s - (ch.t_hi - 4.0))))
+                                         -abs(c.anchor_s - (ch.t_hi - SCOREBOARD_LAG_S))))
         else:
-            c = make_goal_candidate(sig, max(ch.t_hi - 4.0, 0.0), f"cand-sb{k:02d}", cfg)
+            c = make_goal_candidate(sig, max(ch.t_hi - SCOREBOARD_LAG_S, 0.0), f"cand-sb{k:02d}", cfg)
             cands.append(c)
         goal_ids.add(c.id)
-        info[c.id] = {"before": list(ch.before), "after": list(ch.after)}
+        info[c.id] = {"before": list(ch.before), "after": list(ch.after), "t_lo": ch.t_lo, "t_hi": ch.t_hi}
     for c in cands:
         if c.id in goal_ids:
             c.features["score_goal"] = 1.0
@@ -353,12 +390,40 @@ def _dedupe(items: list[dict]) -> list[dict]:
     return kept
 
 
-def _merge_close(items: list[dict], gap_s: float) -> list[dict]:
+def fit_duration(
+    start_s: float, end_s: float, anchor_s: float, is_goal: bool, cfg: HighlightsConfig, duration_s: float,
+    goal_s: Optional[float] = None,
+) -> tuple[float, float]:
+    """Política de duración (hoja de ruta §3.4) sobre unos límites ya decididos: 12-30 s para una jugada,
+    hasta 45 s para un gol. El momento clave es el gol real (``goal_s``, primer frame de celebración − un paso)
+    si se conoce, que en cámara única puede ir 20-30 s después del ancla; si no, el ancla.
+
+    1. Lo anterior al momento clave se recorta a ``clip_back_max_s`` (15 s en gol): es lo que menos se echa de
+       menos (en TV la jugada casi nunca se forma; en un gol importa la celebración).
+    2. El clip no pasa de ``clip_max_s`` / ``clip_max_goal_s``: se recorta la cola.
+    3. Si queda por debajo de ``clip_min_s`` se alarga hacia delante y, si no hay vídeo, hacia atrás."""
+    max_s = cfg.clip_max_goal_s if is_goal else cfg.clip_max_s
+    back_max = cfg.clip_back_max_goal_s if is_goal else cfg.clip_back_max_s
+    key = goal_s if (is_goal and goal_s is not None) else anchor_s
+    start = max(0.0, start_s, key - back_max)
+    end = min(duration_s, max(end_s, key + cfg.post_min_s))
+    if end - start > max_s:
+        end = start + max_s
+    if end - start < cfg.clip_min_s:
+        end = min(duration_s, start + cfg.clip_min_s)
+        if end - start < cfg.clip_min_s:
+            start = max(0.0, end - cfg.clip_min_s)
+    return start, end
+
+
+def _merge_close(items: list[dict], gap_s: float, max_merged_s: Optional[float] = None) -> list[dict]:
     """``items`` ya ordenados por inicio: dos jugadas casi seguidas (parada y
-    córner con gol, dos remates seguidos) van en un mismo clip."""
+    córner con gol, dos remates seguidos) van en un mismo clip, salvo que el
+    resultado pase de ``max_merged_s``."""
     merged: list[dict] = []
     for it in items:
-        if merged and it["start_s"] - merged[-1]["end_s"] <= gap_s:
+        if merged and it["start_s"] - merged[-1]["end_s"] <= gap_s and (
+                max_merged_s is None or max(merged[-1]["end_s"], it["end_s"]) - merged[-1]["start_s"] <= max_merged_s):
             prev = merged[-1]
             lead = it if (it["is_goal"] and not prev["is_goal"]) or (
                 it["is_goal"] == prev["is_goal"] and it["final_score"] > prev["final_score"]) else prev
@@ -422,11 +487,22 @@ def generate_highlights(
         with open(cache_path) as f:
             cache = json.load(f)
     client: Optional[VLMClient] = None
+    vlm_state = {"failed": 0}       # llamadas al VLM que fallaron (modelo caído a mitad, o modo solo caché)
     if use_vlm and cands:
-        client = VLMClient(cfg.vlm_base_url, cfg.vlm_model, cfg.vlm_api, cfg.vlm_api_key, cfg.vlm_timeout_s)
+        client = (CacheOnlyClient(cfg.vlm_model) if cfg.vlm_api == "cache"
+                  else VLMClient(cfg.vlm_base_url, cfg.vlm_model, cfg.vlm_api, cfg.vlm_api_key, cfg.vlm_timeout_s))
         if not client.ping():
             logger.warning("VLM no disponible en %s: selección solo por reglas", cfg.vlm_base_url)
             use_vlm, client = False, None
+
+    def ask(what: str, fn, *fn_args):
+        """Una llamada al VLM; si falla se sigue sin ese veredicto (no se cachea el fallo)."""
+        try:
+            return fn(*fn_args)
+        except RuntimeError as exc:
+            vlm_state["failed"] += 1
+            logger.warning("VLM sin respuesta (%s): %s", what, exc)
+            return None
 
     # 2b. Marcador de la retransmisión: cada cambio es un gol confirmado
     timeline: Optional[ScoreTimeline] = None
@@ -469,8 +545,11 @@ def generate_highlights(
             entry = cache.get(key, {})
             if "judge" not in entry or not fresh(entry):
                 stage("vlm", done=k, total=len(to_judge))
-                entry = {"model": cfg.vlm_model, "version": PROMPT_VERSION, "judge": judge_candidate(
-                    client, inputs.video, c.start_s, c.anchor_s, cfg.vlm_frames_judge, cfg.vlm_image_width)}
+                verdict = ask(f"juicio {c.id}", judge_candidate, client, inputs.video, c.start_s, c.anchor_s,
+                              cfg.vlm_frames_judge, cfg.vlm_image_width)
+                if verdict is None:
+                    continue
+                entry = {"model": cfg.vlm_model, "version": PROMPT_VERSION, "judge": verdict}
                 cache[key] = entry
                 _write_json(cache_path, cache)
                 logger.info("VLM %s %s: %s (%.0f s)", c.id, hms(c.anchor_s),
@@ -494,10 +573,13 @@ def generate_highlights(
                         "audio": c.features.get("audio_sustained", 0.0), "passes": c.features.get("n_passes", 0.0),
                         "carry_m": c.features.get("drive_m", 0.0), "after": after_play_text(c.features),
                     })
-                cache[rank_key] = {"model": cfg.vlm_model, "version": PROMPT_VERSION, **rank_candidates(client, items)}
-                _write_json(cache_path, cache)
-            ranking = cache[rank_key]
-            logger.info("Ranking VLM: %s; rechazados: %s", sorted(ranking["rank"].items(), key=lambda kv: kv[1]), ranking["rejected"])
+                ranked = ask("ranking", rank_candidates, client, items)
+                if ranked is not None:
+                    cache[rank_key] = {"model": cfg.vlm_model, "version": PROMPT_VERSION, **ranked}
+                    _write_json(cache_path, cache)
+            ranking = cache.get(rank_key)
+            if ranking is not None:
+                logger.info("Ranking VLM: %s; rechazados: %s", sorted(ranking["rank"].items(), key=lambda kv: kv[1]), ranking["rejected"])
 
     def ensure_end(c: Candidate) -> dict:
         """Clasificación de los frames posteriores al momento clave (cacheada)."""
@@ -505,8 +587,11 @@ def generate_highlights(
         entry = cache.setdefault(key, {"model": cfg.vlm_model, "version": PROMPT_VERSION})
         if not entry.get("end", {}).get("kinds") or not fresh(entry):
             stage("vlm_end")
-            entry["end"] = refine_end(client, inputs.video, c.anchor_s, cfg.post_max_s, cfg.vlm_end_step_s,
-                                      cfg.vlm_frames_end, cfg.vlm_image_width, cfg.post_default_s)
+            end = ask(f"fin {c.id}", refine_end, client, inputs.video, c.anchor_s, cfg.post_max_s, cfg.vlm_end_step_s,
+                      cfg.vlm_frames_end, cfg.vlm_image_width, cfg.post_default_s)
+            if end is None:
+                return {}
+            entry["end"] = end
             entry["model"], entry["version"] = cfg.vlm_model, PROMPT_VERSION
             _write_json(cache_path, cache)
         return entry["end"]
@@ -522,7 +607,7 @@ def generate_highlights(
     stage("select")
     chosen = select_highlights(cands, judges, ranking, cfg, audio_informative(sig))
 
-    # 5. Límites finales (inicio del juicio, fin del VLM), solapes y fusiones
+    # 5. Límites finales (inicio del juicio, fin del VLM), duración, solapes y fusiones
     for item in chosen:
         c: Candidate = item["candidate"]
         judge = judges.get(c.id, {})
@@ -530,17 +615,27 @@ def generate_highlights(
         if judge.get("play_start_s") is not None:
             start_s = min(c.start_s + 10.0, max(c.start_s - 10.0, judge["play_start_s"] - 1.0))
         end_s = c.end_s
+        goal_s: Optional[float] = None
         if client is not None:
-            entry = {"end": ensure_end(c)}
-            vlm_end = entry["end"].get("clip_end_s")
+            end_info = ensure_end(c)
+            kinds = end_info.get("kinds") or []
+            # Las repeticiones de TV solo alargan un gol; tras una parada el clip acaba con la jugada.
+            vlm_end = clip_end_from_kinds(kinds, c.anchor_s, cfg.vlm_end_step_s, cfg.post_max_s, cfg.post_default_s,
+                                          replay_as_reaction=item["is_goal"], replay_tail_max_s=cfg.end_replay_max_s)
             if vlm_end is not None:
                 end_s = min(max(vlm_end, c.anchor_s + cfg.post_min_s), c.anchor_s + cfg.post_max_s)
-            item["end_notes"] = entry["end"].get("notes")
-            item["end_kinds"] = entry["end"].get("kinds")
-        item["start_s"], item["end_s"] = max(0.0, start_s), min(end_s, sig.duration_s)
+            if item["is_goal"]:
+                goal_s = goal_time(c.anchor_s, score_info.get(c.id), kinds, cfg)
+            item["end_notes"] = end_info.get("notes")
+            item["end_kinds"] = kinds
+        start_s, end_s = max(0.0, start_s), min(end_s, sig.duration_s)
+        item["before_fit"] = {"start_s": round(start_s, 2), "end_s": round(end_s, 2)}
+        item["goal_s"] = goal_s
+        item["start_s"], item["end_s"] = fit_duration(start_s, end_s, c.anchor_s, item["is_goal"], cfg,
+                                                      sig.duration_s, goal_s)
     chosen = _dedupe(chosen)
     chosen.sort(key=lambda it: it["start_s"])
-    chosen = _merge_close(chosen, cfg.merge_gap_s)
+    chosen = _merge_close(chosen, cfg.merge_gap_s, cfg.clip_max_merged_s)
 
     # 6. Corte
     results = []
@@ -565,6 +660,8 @@ def generate_highlights(
             "score": score, "goal_fusion": (round(gf, 3) if (gf := goal_fusion(judge, c.features)) is not None else None),
             "vjepa": {k2: round(c.features[k2], 3) for k2 in VJ_FEATURES if k2 in c.features} or None,
             "candidate_id": c.id, "merged_from": item.get("merged_from"), "sources": c.sources,
+            "goal_s": (round(item["goal_s"], 2) if item.get("goal_s") is not None else None),
+            "before_fit": item.get("before_fit"),
         })
     # Los clips sobrantes de una generación anterior no deben quedar colgando.
     for stale in out_dir.glob("clip_*.mp4"):
@@ -573,7 +670,9 @@ def generate_highlights(
 
     report = {
         "video": str(inputs.video), "generated_at": _now(),
-        "vlm": {"used": client is not None, "model": cfg.vlm_model if client is not None else None},
+        "vlm": {"used": client is not None, "model": cfg.vlm_model if client is not None else None,
+                "api": cfg.vlm_api if client is not None else None,
+                "degraded": client is not None and vlm_state["failed"] > 0, "n_failed_calls": vlm_state["failed"]},
         "has_audio": sig.has_audio, "audio_informative": audio_informative(sig), "n_candidates": len(cands),
         "scoreboard": timeline.to_dict() if timeline is not None else None,
         "vjepa": {"used": vjepa_used},
