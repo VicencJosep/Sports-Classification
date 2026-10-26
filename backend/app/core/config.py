@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     project_root: Path = PROJECT_ROOT
     pipeline_python: Path = Path("/opt/venv/bin/python")
     pipeline_command: str | None = None   # sustituye a "<pipeline_python> -m main" (tests)
+    highlights_command: str | None = None  # sustituye a "<pipeline_python> -m analytics.highlights" (tests)
     render_video: bool = False            # final.mp4 no se reproduce en navegadores y pesa ~5 GB
     skip_homography: bool = False
     # Equipos (PRTReID + K-Means) exige el paquete `prtreid`, que no siempre está instalado en el
@@ -53,6 +54,11 @@ class Settings(BaseSettings):
         if self.pipeline_command:
             return shlex.split(self.pipeline_command)
         return [str(self.pipeline_python), "-m", "main"]
+
+    def highlights_base_command(self) -> list[str]:
+        if self.highlights_command:
+            return shlex.split(self.highlights_command)
+        return [str(self.pipeline_python), "-m", "analytics.highlights"]
 
     @property
     def videos_dir(self) -> Path:

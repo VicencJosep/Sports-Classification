@@ -178,6 +178,12 @@ class BallSpottingConfig:
     # serían sobre todo falsas alarmas. Para emitirlos igualmente, añadirlos aquí.
     tdeed_event_labels: tuple[str, ...] = ("shot", "goal", "throw-in", "corner", "foul")
     mixed_event_labels: tuple[str, ...] = ("shot", "goal", "throw-in")  # los de T-DEED con event_source="mixed"
+    # Eventos que se emiten pero SIN verdad medida en nuestros partidos: van marcados ``estimated`` en la
+    # telemetría y en la API para que la interfaz los enseñe como estimación. Falta: P 0/3 en los 20 min de
+    # Middlesbrough (2 faltas reales), 17/32 en el Clásico (preliminar, partido que T-DEED vio al entrenar).
+    # Córner (F1 0,89 en SoccerNet-v2, también in-sample) se mide primero en el juvenil anotado. Para dejar de
+    # emitir una clase, quitarla de tdeed_event_labels.
+    tdeed_estimated_event_labels: tuple[str, ...] = ("foul",)
     event_smooth_frames: int = 6            # ~0,5 s (frames muestreados a 12,5 fps)
     action_min_score: float = 0.5
     action_nms_s: float = 0.5               # ~12 frames: acciones seguidas del mismo tipo
@@ -339,6 +345,114 @@ class PublisherConfig:
 
 
 @dataclass(frozen=True)
+class HighlightsConfig:
+    """Hiperparámetros de analytics/highlights (mejores jugadas de un partido
+    ya analizado). Tres bloques: anclas/jugada (reglas, sin vídeo), VLM
+    (selección y corte) y selección final.
+
+    Los umbrales de ancla son MUY bajos a propósito: en los partidos
+    juveniles T-DEED puntúa un gol real a SHOT 0,1-0,2 y GOAL ~0 (no sale en
+    telemetry.json); aquí solo se piden candidatos, el VLM filtra después.
+    """
+
+    # Anclas (momento clave)
+    shot_min_score: float = 0.08            # curva SHOT (o "Shots on/off target" de SoccerNet)
+    goal_min_score: float = 0.02            # curva GOAL (o "Goal" de SoccerNet)
+    audio_min_sustained_db: float = 6.0     # media 15 s del audio sobre la mediana móvil de 5 min
+    audio_min_actions: int = 3              # acciones de balón en ±30 s: balón en juego (no descanso)
+    anchor_merge_s: float = 15.0            # anclas más cercanas son la misma jugada
+
+    # Jugada hacia atrás (cadena de acciones del equipo atacante)
+    play_max_back_s: float = 35.0
+    play_min_back_s: float = 6.0
+    play_default_back_s: float = 10.0       # sin acciones conocidas
+    play_pre_s: float = 1.5                 # margen antes de la primera acción
+    play_gap_s: float = 6.0                 # hueco máximo entre acciones de la cadena
+    dead_ball_out_score: float = 0.35       # curva OUT por encima = balón parado entre acciones
+
+    # Fin provisional (reglas; el VLM lo afina)
+    post_min_s: float = 8.0
+    post_max_s: float = 45.0                # celebración + repeticiones de TV
+    post_default_s: float = 12.0
+    audio_tail_db: float = 3.0              # se alarga mientras el audio sostenido supere esto
+
+    # Pesos de la puntuación por reglas (solo ordena candidatos)
+    w_goal: float = 3.0
+    w_shot: float = 2.0
+    w_audio: float = 0.12                   # por dB sostenido (tope 15)
+    w_restart: float = 0.8                  # saque de centro después = gol
+    w_passes: float = 0.05                  # por pase de la jugada (tope 10)
+    w_drive: float = 0.02                   # por metro de conducción de un jugador (tope 40)
+    w_burst: float = 0.3                    # por tiro extra en ±60 s (tope 3)
+    w_near_goal: float = 0.3                # balón a < 40 m de portería en el ancla
+
+    # VLM (Qwen3.5 con visión). "ollama": API nativa; "openai": vLLM u otro compatible.
+    vlm_enabled: bool = True
+    vlm_api: str = "ollama"
+    vlm_base_url: str = "http://localhost:11434"
+    vlm_model: str = "qwen3.5:9b-q8_0"
+    vlm_api_key: str = "EMPTY"
+    vlm_timeout_s: float = 900.0
+    vlm_max_candidates: int = 10            # mejores por reglas que ve el VLM (+ goles claros)
+    vlm_frames_judge: int = 12
+    vlm_frames_end: int = 16
+    vlm_end_step_s: float = 4.0
+    vlm_image_width: int = 640
+
+    # Marcador de la retransmisión (cambio de marcador = gol); lo lee el VLM
+    scoreboard_enabled: bool = True
+    scoreboard_step_s: float = 30.0         # una lectura cada tanto; el cambio se localiza luego por bisección
+    scoreboard_min_valid: float = 0.25      # fracción de lecturas legibles para fiarse de que hay rótulo
+    scoreboard_goal_before_s: float = 45.0  # el gol (ancla) cae hasta tanto antes de que el rótulo cambie
+    scoreboard_goal_near_s: float = 20.0    # ...pero normalmente dentro de este margen: si hay candidatos ahí, es uno de ellos
+    w_scoreboard: float = 5.0               # bonus de reglas al candidato del gol confirmado
+
+    # V-JEPA2 + SVC como segundo juez de gol (sin marcador): ventanas de 6 s
+    # en rejilla fija; el golpeo se mira en todos los candidatos y lo que pasa
+    # después (saque de centro / córner / banda) en los mejores o con indicio
+    vjepa_enabled: bool = True
+    vjepa_window_s: float = 6.0
+    vjepa_goal_pre_s: float = 3.0           # ventana de gol: [ancla - pre, ancla + post]
+    vjepa_goal_post_s: float = 9.0
+    vjepa_after_from_s: float = 12.0        # saque de centro: [ancla + from, ancla + to]
+    vjepa_after_to_s: float = 96.0
+    vjepa_deadball_to_s: float = 45.0       # córner/banda poco después = no fue gol
+    vjepa_max_candidates: int = 30          # ventanas posteriores para estos (+ vj_goal >= after_min_goal)
+    vjepa_after_min_goal: float = 0.1
+    vjepa_loud_min_goal: float = 0.2        # con griterío (audio informativo), esto basta para que el VLM lo vea
+    vjepa_classifier_path: str | None = None  # por defecto core.events.DEFAULT_CLASSIFIER_PATH
+    vjepa_model_id: str | None = None
+    w_vj_goal: float = 2.0                  # bonus de reglas (ordena; que el VLM vea los goles probables)
+    w_vj_kickoff: float = 0.5
+    goal_fusion_min: float = 1.4            # vjepa.goal_fusion >= esto (y celebración vista) -> "gol probable"
+    goal_audio_min_db: float = 6.0          # griterío sostenido que, con celebración vista, hace "gol probable" (cámara única)
+
+    # Selección final: entre min y max clips, por encima de select_min_score
+    min_clips: int = 3
+    max_clips: int = 6
+    select_min_score: float = 0.45
+    w_final_rules: float = 0.4
+    w_final_vlm: float = 0.6
+    merge_gap_s: float = 20.0               # jugadas casi seguidas (parada -> córner -> gol) en un clip
+
+    # Duración de los clips (hoja de ruta §3.4): 12-30 s; los goles son la excepción (hasta 45 s para que
+    # quepa la celebración, contados desde el gol y no desde el ancla, que en cámara única puede ir 20-30 s
+    # antes). Se aplica en pipeline.fit_duration tras fijar los límites con el VLM: primero se recorta lo
+    # anterior al momento clave (clip_back_max_s) y luego la cola; lo más corto de clip_min_s se alarga.
+    clip_min_s: float = 12.0
+    clip_max_s: float = 30.0
+    clip_max_goal_s: float = 45.0
+    clip_back_max_s: float = 12.0           # como mucho tanto antes del momento clave (jugada sin gol)
+    clip_back_max_goal_s: float = 15.0      # ...y en un gol
+    end_replay_max_s: float = 8.0           # las repeticiones de TV (solo cuentan tras un gol) alargan como mucho esto
+    clip_max_merged_s: float = 40.0         # dos jugadas seguidas solo se funden si el clip no pasa de esto
+
+    # Corte
+    ffmpeg_crf: int = 20
+    ffmpeg_preset: str = "medium"
+
+
+@dataclass(frozen=True)
 class PipelineConfig:
     """Configuración raíz que main.py pasará a cada módulo."""
 
@@ -351,4 +465,5 @@ class PipelineConfig:
     analytics: AnalyticsConfig = field(default_factory=AnalyticsConfig)
     full_match: FullMatchConfig = field(default_factory=FullMatchConfig)
     publisher: PublisherConfig = field(default_factory=PublisherConfig)
+    highlights: HighlightsConfig = field(default_factory=HighlightsConfig)
     outputs_dir: Path = OUTPUTS_DIR

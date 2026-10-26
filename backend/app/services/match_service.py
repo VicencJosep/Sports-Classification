@@ -6,15 +6,20 @@ from app.schemas import Match, MatchCreate, MatchPart, MatchPartRecord, MatchRec
 from app.schemas.common import PART_LABELS, new_id, utcnow_iso
 
 from .analysis_service import AnalysisService, derive_status
+from .highlights_service import HighlightsService
 from .video_service import VideoService
 
 
 class MatchService:
-    def __init__(self, matches: MatchRepository, runs: RunStore, videos: VideoService, analysis: AnalysisService) -> None:
+    def __init__(
+        self, matches: MatchRepository, runs: RunStore, videos: VideoService, analysis: AnalysisService,
+        highlights: HighlightsService | None = None,
+    ) -> None:
         self.matches = matches
         self.runs = runs
         self.videos = videos
         self.analysis = analysis
+        self.highlights = highlights
 
     def create(self, data: MatchCreate) -> Match:
         for p in data.parts:
@@ -55,6 +60,7 @@ class MatchService:
             parts.append(MatchPart(
                 id=p.id, kind=p.kind, label=p.label, mode=run.mode if run else p.mode, status=st.status,
                 stage=st.stage, error=st.error, video=self.videos.to_public(video) if video else None,
+                highlights=self.highlights.summary(record.id, p.id) if self.highlights else None,
             ))
         errors = [p.error for p in parts if p.error]
         durations = [p.video.duration_s for p in parts if p.video]

@@ -82,11 +82,27 @@ Notas:
 - `ball/*.npz` está reconstruida entre eventos anotados: nunca como entrada de un modelo (filtra la cronología
   de los eventos).
 
-## 4. SoccerNet Tracking (cajas de balón en TV) — pendiente de descargar
+## 4. SoccerNet Tracking (cajas de balón en TV)
 
-Se usará para el detector de balón único (TV + panorámica). Al descargarlo, fijar aquí su partición antes de
-entrenar: la oficial del dataset (train/test) si la trae; si no, por partido, y comprobar que ninguno de sus
-partidos coincide con los de evaluación de la sección 1.
+Ya se usó: el detector de balón `models/ball/yolo11s_snt_ball.pt` se entrenó con él (octubre de 2026). Se adopta la
+partición oficial del dataset (`train` / `test`, por secuencias de 30 s de partidos de la Swiss Super League): se
+entrena con `train` y se mide en `test`. Sus partidos no coinciden con ninguno de los de evaluación de la sección 1
+(otra liga). Si se vuelve a entrenar el detector único (TV + panorámica), `test` sigue siendo solo de medida.
+
+Nota sobre el **Clásico 2016/17** (Real Madrid 2-3 Barcelona, `datasets/clasico_2017/`, también en
+`datasets/SoccerNet/spain_laliga/2016-2017/2017-04-23 - 21-45 Real Madrid 2 - 3 Barcelona/Labels-v2.json`): está en
+SoccerNet-v2, con el que T-DEED preentrenó, así que para T-DEED es **in-sample** (cifras optimistas). Se usa como
+única verdad de córner, falta y banda en TV y para desarrollar highlights (validación), nunca como evaluación.
+
+## 6. Partidos propios (juveniles, cámara única; vídeos de YouTube)
+
+Son el dominio del producto y no están en ningún dataset público. Papel fijado el 2026-10-21:
+
+| Papel | Partidos |
+|---|---|
+| **Validación** | Mallorca–Barcelona juvenil (`433f62c92b727870` en el backend; 3 goles) y Espanyol–Damm juvenil (`f2c9315d3394c6ee`; 0 goles; 30 fps). Ya sirvieron para fijar umbrales de highlights (`goal_audio_min_db`, anclas) y para mirar errores: no valen como evaluación. La anotación manual de acciones y eventos (`output/annotations/<partido>_Ground_Truth.csv`, lector `scripts/annotation_csv.py`) se hace sobre estos dos. |
+| **Evaluación** | Dos juveniles nuevos, sin abrir ni mirar hasta que el pipeline esté cerrado; solo se miden (acciones, eventos, goles y highlights) con el marcador o la anotación como verdad. Pendiente de elegirlos. |
+| **Entrenamiento** | Ninguno de momento. Si se afina T-DEED con juveniles (`SNB_tv1`), los partidos anotados para ello serán nuevos y distintos de los dos de validación y los dos de evaluación. |
 
 ## 5. Resumen por modelo que se vaya a entrenar
 

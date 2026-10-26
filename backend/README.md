@@ -51,6 +51,9 @@ Configuración: variables `BACKEND_*` o `backend/.env` (ver `.env.example`). El 
 | `POST /api/matches/{id}/parts/{part}/reingest` | Re-normaliza las salidas crudas de una parte completada (tras cambiar adaptadores), sin pipeline |
 | `GET /api/matches/{id}/parts/{part}/tracklets` | Resumen por tracklet (rol y dorsal mayoritarios, equipo, primer/último frame) |
 | `GET /api/matches/{id}/parts/{part}/tracking?from_s=&to_s=` | Frames de tracking de una ventana (máx. 120 s) |
+| `POST /api/matches/{id}/parts/{part}/highlights` | Encola la generación de las mejores jugadas de una parte ya analizada (`analytics/highlights`; cuerpo opcional `{"force": true}` para no reutilizar cachés). También se encadena sola al acabar el análisis si `POST .../analysis` llevó `{"highlights": true}` |
+| `GET /api/matches/{id}/parts/{part}/highlights` | Estado de la generación (`pending`, `processing` + etapa, `completed`, `error`) y, al terminar, los clips (título, inicio/fin, etiqueta, `content_url`) |
+| `GET /api/matches/{id}/parts/{part}/highlights/{clip}/content` | El clip MP4, con `Range` (206) |
 
 Convenciones: tiempos en segundos desde el inicio del vídeo de la parte (`*_s`), `frame_idx` desde 0
 (`timestamp_s = frame_idx / fps`), fechas ISO-8601 UTC; coordenadas en píxeles del frame original y `field_xy` en
