@@ -22,7 +22,7 @@ VLMs grandes) se decidirían a ojo. Lo segundo que cojea es la infraestructura d
 
 **Primera semana, concreta**
 1. ☑ (B) **Hecho 2026-10-21**: `scripts/annotation_csv.py` (lector), `scripts/evaluate_match.py` (arnés único) y `scripts/build_ground_truth.py` (reescrito: Labels-ball, Labels-v2 con desfases por mitad, CSV). Middlesbrough reproduce 87,7/89,1 (F1 88,4) y equipo 68,1 % (231/339; clústeres de pureza 76/62 %) [M]. Espanyol 25-30 contra la hoja en curso (126 filas): acciones P 81,1 / R 84,9 / F1 82,9; equipo **62,1 %** (clúster 0 con pureza 50,8 %); tracker del ejecutor igual al del pipeline 91,5 % [M]. Uso: `python -m scripts.evaluate_match --csv output/annotations/espanyol_damm_Ground_Truth.csv --backend-match f2c9315d3394c6ee --list-errors` (corre en el host, sin numpy).
-2. ☐ (C) **En marcha**: cadena desatendida lanzada el 2026-10-21 08:19 dentro del contenedor (`scripts/shot_benchmark/run_pano1_tv.sh`), espera a que haya ≥ 8 GB de VRAM (ese día la GPU estaba a 23/24 GB por tres procesos ajenos), escanea los 5 vídeos y lanza `pano1_tv_report.sh`. Seguimiento: `output/pano1_tv/chain.log`; resultados en `output/pano1_tv/*.txt`. Criterio: tabla AP tiros / F1 acciones Middlesbrough y P(SHOT+GOAL) en los goles del Mallorca, base frente a afinado.
+2. ☑ (C) **Hecho 2026-10-21** (cadena `scripts/shot_benchmark/run_pano1_tv.sh`, 52 min de GPU a 6,2 GB; informes en `output/pano1_tv/`). Resultado mixto, tabla y veredicto en §3.6: `SNB_pano1` **sí ve los 3 goles del Mallorca como tiro** (SHOT+GOAL 0,12/0,01/0,16 → 0,47/0,55/0,41 [M]) pero **hunde la EFL** (tiros Middlesbrough AP 85,0 → 73,8; acciones F1 −14 pt, la clase header desaparece; la cabeza SoccerNet pierde "Goal" en el Clásico). Conclusión: el estilo "cámara única sin zoom" transfiere, pero afinar solo con renders especializa → `SNB_tv1` solo mezclando EFL en cada lote (o backbone congelado) y entrenando las dos cabezas.
 3. ☑ (B) **Hecho 2026-10-21** (rama `feat/highlights`): política 12-30 s / gol ≤ 45 s en `pipeline.fit_duration`, repeticiones solo tras gol, tope de fusión 40 s, `evaluate.py` con duración/en rango/Δancla/s antes y después del gol/`ref_clips`, GT apuntando al backend, Middlesbrough añadido, modo `--vlm-cache-only` (sin GPU ni Ollama). Resultado: **20/20 clips en rango** (mediana 28,6 s), **8/8 goles, 0 falsos** [M]. De paso, dos arreglos: el gol se asigna al candidato de los 20 s anteriores al cambio de rótulo (el 1-0 del Mallorca iba 27 s antes) y no se re-ancla por celebración si hay rótulo (en TV las repeticiones van antes). Pendiente de ti: tope 45/50 y 15/10 s previos (tabla en `docs/highlights_evaluacion.md`).
 4. ☐ (A) Espanyol 25-30 cerrado; **plantilla de eventos decidida**: la misma hoja y las mismas 4 columnas, con etiquetas `shot`, `goal`, `corner`, `foul`, `free kick`, `penalty`, `kick off`, `out` (el lector las entiende; `dorsal` = tracker del ejecutor, `equipo` = quien ejecuta); anotar la 1ª parte completa.
 5. ☑ (B) **Hecho 2026-10-21**: `foul` sigue emitiéndose pero marcado `estimated: true` en `telemetry.json` (`EventSpan.estimated`, `BallSpottingConfig.tdeed_estimated_event_labels`) y en la API (`MatchEvent.estimated`); el panel del frontend aún no lo pinta. Para dejar de emitirlo, quitarlo de `tdeed_event_labels`.
@@ -60,9 +60,9 @@ en el contenedor (copiar al proyecto).
 | ☐ | **Clásico como GT de TV**: alinear `Labels-v2.json` de SoccerNet (5 Goal, 20 tiros, 10 Corner, 18 Foul, 29 Throw-in) con el vídeo de YouTube (desfases ~359 s y ~3.554 s [M, preliminar]) y medir córner/falta/tiro/banda. In-sample para T-DEED: cifras optimistas, pero es la única verdad de córner y falta en TV | Informe por evento del Clásico | 0,5 d | Existente |
 | ☐ | Córner, banda, tiro y falta en el juvenil anotado con `respot_telemetry.py`; prueba de remuestreo a 25 fps del Espanyol | Tabla P/R por evento en Espanyol | 1 d + 20 min GPU | A |
 | ☐ | Confirmación de gol en main: por **saque de centro visto** (geometría del tracking, ya existe en highlights) y, si se decide el VLM, por marcador | Clásico 1 → 5 goles; Mallorca 0 → 3 | 1 d | Existente |
-| ☐ | **Experimento barato SNB_pano1 en TV** (§3.6) | En marcha desde 2026-10-21 (cadena esperando VRAM; `output/pano1_tv/chain.log`) | 1 h GPU | Existente |
+| ☑ | **Experimento barato SNB_pano1 en TV** (§3.6) | Hecho 2026-10-21: tabla en §3.6; señal en juveniles, pérdida en EFL | 1 h GPU | Existente |
 | ☐ | **Etiqueta de las acciones: combinada o spotter** (hallazgo 2026-10-21 al regenerar con `respot_telemetry`, que etiqueta solo con T-DEED): Middlesbrough spotter 90,3/91,8 frente a combinada 87,7/89,1 (+2,7 F1), pero Espanyol 25-30 spotter 72,7/76,2 frente a combinada 81,1/84,9 (−8,5) [M]. El R3D-18 ayuda fuera de la EFL y estorba dentro | Decidir con el juvenil anotado entero; mientras, combinada (la de producción) | 0 | A |
-| ☐ | **SNB_tv1** (solo si §3.6 da señal): `challenge2` + EFL train (4) + renders de referencia de SoccerTrack train (+ juveniles de entrenamiento anotados cuando existan) | No bajar > 2 pt en Middlesbrough; cabeza SN estable; mejora visible en juveniles; una medida en eval | 2-3 d + 10-12 h GPU entera | A (≥ 2 juveniles más) |
+| ☐ | **SNB_tv1** (§3.6 dio señal el 2026-10-21): `challenge2` + EFL train (4) **mezclado en cada lote** con renders de referencia de SoccerTrack train (+ juveniles de entrenamiento anotados cuando existan); entrenar las dos cabezas (SN con sus 10 partidos de ajuste) o `--freeze-backbone`; antes, `tdeed_finetune_data.py` tiene que aceptar EFL plano y mezclar fuentes (~0,5 d, CPU) | No bajar > 2 pt en Middlesbrough (tiros 85,0, acciones F1 ~91 con etiqueta spotter); header y cabeza SN estables; los 3 goles del Mallorca > 0,3 como tiro; precisión de tiros en el juvenil anotado | 2-3 d + 10-12 h GPU entera (hoy 8,8 GB libres: no cabe) | A (tiros anotados en Espanyol/Mallorca) |
 | ☐ | Coherencia temporal del balón en posesión si el equipo no supera el umbral acordado | Equipo > umbral | 2-3 d | Existente |
 | ☐ | GT de Stoke y Reading desde Labels-ball con el generador reescrito (cachés `720p.tracks/possession` ya existen: 0 GPU) | Única cifra final limpia del pipeline en TV (`SoccerNetBall_test`) | 1 d | Existente |
 
@@ -244,6 +244,27 @@ cambian, el fallo juvenil no es el estilo de cámara y hay que anotar antes que 
 mejorar la EFL es baja y la de mejorar juveniles, desconocida; dos juveniles anotados rendirán más que SNB_tv1, pero la hora
 de GPU es barata y conviene saberlo.
 
+**Resultado (2026-10-21, `output/pano1_tv/`; base = `challenge2`, afinado = `SNB_pano1`) [M]:**
+
+| Medida | base | afinado |
+|---|---|---|
+| Middlesbrough completo, tiros AP ±3 s (25 tiros; `tdeed_eval.py`) | **85,0 %** | 73,8 % (±1 s: 85,0 → 70,0) |
+| Middlesbrough, AUC tiro/centro sobre candidatos | 0,98 | 0,89 |
+| Middlesbrough 20 min, acciones P/R/F1 (etiqueta spotter, umbral auto) | 90,3 / 91,8 / 91,0 | 78,6 / 74,9 / 76,7; **header 0/29** (van a pass) |
+| Middlesbrough 20 min, eventos tiro / banda (F1) | 66,7 / 92,9 | igual |
+| Mallorca, SHOT+GOAL máx. ±5 s en los 3 goles | 0,12 / 0,01 / 0,16 | **0,47 / 0,55 / 0,41** (GOAL sigue ≤ 0,09) |
+| Mallorca, picos SHOT ≥ 0,3 por 90 min | 4,5 | 14,5 (precisión sin medir: faltan tiros anotados) |
+| Espanyol, picos SHOT ≥ 0,3 por 90 min | 4,6 | 8,6 |
+| Clásico (in-sample), SHOT máx. en los 5 goles | 0,59-0,99 | 0,69-0,96 (igual) |
+| Clásico, cabeza SoccerNet "Goal" en los 5 goles | 0,25-0,61 | 0,04-0,32; picos Goal ≥ 0,3 por 90 min 5,8 → 0 |
+
+Veredicto: se cumplen a la vez la primera condición (Middlesbrough cae 11 pt en tiros y 14 en acciones: los renders
+especializan, y además la cabeza SoccerNet se desalinea) y la segunda (3/3 goles del Mallorca pasan de 0,3 como tiro: el
+estilo de cámara transfiere). Por tanto `SNB_tv1` merece la GPU entera, pero solo mezclando EFL en cada lote (o con
+`--freeze-backbone`) y entrenando las dos cabezas; y su medida en juveniles necesita los tiros anotados por el usuario
+(sin ellos, 14,5 picos/90 min puede ser recall o falsas alarmas). La subida de "equipo" en la tabla de acciones del
+afinado (68,1 → 77,1 %) es un artefacto: cambian las parejas emparejadas, no `teams.json`.
+
 ## 4. Qué no hacer (vías agotadas, con cifra)
 
 - Verificador VLM de tiros en cualquier variante: AUC tiro/centro 0,50-0,65 frente a 0,87 de T-DEED [estudio §2a-§5].
@@ -306,4 +327,7 @@ de GPU es barata y conviene saberlo.
   degradado del VLM en `HighlightsResponse` (backend: 22 tests OK). (4) Partición de juveniles y nota del Clásico en
   `docs/particion_datasets.md`. (5) Carril C: cadena `run_pano1_tv.sh` lanzada y esperando VRAM (GPU a 23/24 GB ajena).
   Hallazgo [M]: etiqueta spotter frente a combinada, +2,7 F1 en Middlesbrough y −8,5 en Espanyol (ver §2.1). Sin medir
-  aún: córner/falta/tiro en el juvenil (la hoja no tiene eventos todavía).
+  aún: córner/falta/tiro en el juvenil (la hoja no tiene eventos todavía). Commits del usuario: 61be4fe (arnés y GT) y
+  8a56011 (duración de clips). Más tarde la GPU se liberó y la cadena §3.6 corrió sola (52 min): `SNB_pano1` ve los 3 goles
+  del Mallorca como tiro (> 0,4) pero hunde la EFL (tiros −11 pt, header desaparece, cabeza SN sin "Goal"); `SNB_tv1` queda
+  condicionado a mezclar EFL en cada lote y a tener tiros anotados en juveniles (tabla en §3.6).
