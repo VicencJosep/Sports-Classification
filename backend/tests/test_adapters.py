@@ -17,6 +17,15 @@ def test_clip_background_event_is_dropped():
     assert to_events(raw, 2.0) == []
 
 
+def test_goal_source_and_score_pass_through():
+    span = {"start_s": 9.0, "end_s": 11.0, "peak_confidence": 1.0, "mean_confidence": 1.0, "n_windows": 1}
+    raw = {"events": [{**span, "label": "goal", "goal_source": "scoreboard", "score": [1, 0]},
+                      {**span, "label": "shot", "start_s": 20.0, "end_s": 22.0}], "ball_actions": []}
+    goal, shot = to_events(raw, 60.0)
+    assert (goal.goal_source, goal.score) == ("scoreboard", [1, 0])
+    assert (shot.goal_source, shot.score) == (None, None)
+
+
 def test_malformed_telemetry():
     with pytest.raises(MalformedOutputError):
         build_part_analysis({"source_video": "x"}, None, match_id="m", part_id="full", fps=25, duration_s=1)

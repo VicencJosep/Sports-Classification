@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import shutil
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -508,6 +509,10 @@ def generate_highlights(
     timeline: Optional[ScoreTimeline] = None
     score_info: dict[str, dict] = {}
     if client is not None and cfg.scoreboard_enabled:
+        # El análisis (analytics/goals.py) ya leyó el marcador: se parte de sus lecturas.
+        analysis_cache = inputs.telemetry.parent / "scoreboard.json"
+        if not (out_dir / "scoreboard.json").exists() and analysis_cache.exists():
+            shutil.copyfile(analysis_cache, out_dir / "scoreboard.json")
         timeline = build_timeline(
             client, inputs.video, sig.duration_s, cfg.scoreboard_step_s, cfg.scoreboard_min_valid,
             out_dir / "scoreboard.json", cfg.vlm_model,

@@ -341,6 +341,8 @@ class EventSpan:
     mean_confidence: float
     n_windows: int
     estimated: bool = False            # clase emitida sin verdad medida (p.ej. falta): la UI lo enseña como estimación
+    goal_source: Optional[str] = None  # solo goles (analytics/goals.py): scoreboard, kickoff o tdeed
+    score: Optional[list[int]] = None  # marcador tras el gol [local, visitante] si lo confirmó el rótulo
 
     def to_telemetry(self) -> dict:
         return asdict(self)
@@ -362,6 +364,7 @@ class FullMatchTelemetry:
     n_frames: int
     n_possession_changes: int
     spot_thresholds: Optional[dict] = None  # SpotThresholds usados (None sin T-DEED)
+    goals: Optional[dict] = None       # resumen de analytics/goals.py (marcador, goles confirmados)
 
     def to_telemetry(self) -> dict:
         return asdict(self)

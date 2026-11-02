@@ -41,6 +41,8 @@ def to_events(raw: dict, duration_s: float) -> list[MatchEvent]:
                     mean_confidence=float(e["mean_confidence"]),
                     n_windows=int(e["n_windows"]),
                     estimated=bool(e.get("estimated", False)),
+                    goal_source=e.get("goal_source"),
+                    score=e.get("score"),
                 )
                 for i, e in enumerate(spans)
             ]

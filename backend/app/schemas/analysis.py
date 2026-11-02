@@ -56,6 +56,8 @@ class MatchEvent(BaseModel):
     mean_confidence: float
     n_windows: int
     estimated: bool = False     # clase sin verdad medida (p.ej. foul): la UI la enseña como "estimado"
+    goal_source: str | None = None   # solo goles: scoreboard (cambio del marcador), kickoff (saque de centro) o tdeed
+    score: list[int] | None = None   # marcador [local, visitante] tras el gol, si lo confirmó el rótulo
 
 
 class BallAction(BaseModel):

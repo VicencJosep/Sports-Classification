@@ -400,6 +400,17 @@ def _run_full_match(args: argparse.Namespace, cfg: config.PipelineConfig) -> Non
     # analyze_full_match, y así el radar puede colorearse ya por equipo.
     _run_homography(args.source, tracks_path, output_dir, cfg, args)
 
+    # Después de la homografía: el saque de centro se mira en metros
+    # (tracks_2d.jsonl). Reescribe telemetry.json con los goles confirmados.
+    if not args.skip_events:
+        from analytics.goals import confirm_goals
+
+        telemetry.events, telemetry.goals = confirm_goals(
+            args.source, output_dir, telemetry.events, cfg.highlights, use_scoreboard=not args.skip_scoreboard
+        )
+        with open(telemetry_path, "w") as f:
+            json.dump(telemetry.to_telemetry(), f, indent=2)
+
     if not args.skip_render and cfg.full_match.render_video:
         final_path = output_dir / "final.mp4"
         render_match_video(
@@ -456,6 +467,9 @@ def main() -> None:
                              "config.HomographyConfig.stride)")
     parser.add_argument("--radar", action="store_true",
                         help="Escribe radar.mp4 (vista cenital) además de tracks_2d.jsonl")
+    parser.add_argument("--skip-scoreboard", action="store_true",
+                        help="Solo --mode full-match: no leer el marcador con el VLM para confirmar goles "
+                             "(queda el saque de centro; ver analytics/goals.py)")
     parser.add_argument("--skip-render", action="store_true", help="No escribir final.mp4, solo telemetry.json")
     parser.add_argument("--trace-length", type=int, default=None,
                         help="Frames de estela por jugador en el vídeo final (0 = solo el círculo, sin estela); "
