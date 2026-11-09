@@ -18,11 +18,6 @@ from pathlib import Path
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parent
 
-# Repositorio Soccer_Master (detección player/goalkeeper/referee/ball + dorsal)
-SOCCER_MASTER_DIR: Path = PROJECT_ROOT / "Soccer_Master" / "SoccerMaster"
-SOCCER_MASTER_CONFIG: Path = SOCCER_MASTER_DIR / "configs" / "pretrain.yaml"
-SOCCER_MASTER_CHECKPOINTS: Path = SOCCER_MASTER_DIR / "pretrained_models" / "SoccerMaster"
-
 # Repositorio PnLCalib (calibración de campo: keypoints + líneas -> homografía).
 # Clonado de https://github.com/mguti97/PnLCalib — solo se usa su CÓDIGO
 # (model/, utils/, config/). Vive bajo models/homography/ — para no ensuciar la

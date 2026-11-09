@@ -37,7 +37,7 @@ for cls, nms, smooth in (("SHOT", 4.0, 6), ("PASS", 0.5, 1), ("DRIVE", 0.5, 1), 
         print(f"\n=== {cls} ({len(gt[cls])} anotados), tolerancia ±{tol:g} s ===")
         for name, f in (("panorámica entera (4096x1080→796x448)", "clips [117093_1st_0-630].npz"), ("cámara virtual 1280x720 → 796x448", "clips [117093_1st_0-630_vcam].npz")):
             row(name, gt[cls], peaks_of(TD / f, cls, nms, smooth), tol)
-# referencia: ¿qué hacía T-DEED con estas mismas clases en TV (3 EFL limpios)? -> ver docs/estudio_deteccion_tiros.md
+# referencia: ¿qué hacía T-DEED con estas mismas clases en TV (3 EFL limpios)? -> ver docs/archivo/estudio_deteccion_tiros.md
 
 # pipeline completo sobre la cámara virtual (telemetry.json): acciones de balón y tiros
 tel = json.load(open("output/panorama_vcam/telemetry.json"))

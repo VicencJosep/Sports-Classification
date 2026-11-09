@@ -339,8 +339,7 @@ class SoccerMasterDetector:
 
     El modelo es temporal: procesa clips de ``NUM_FRAMES`` frames (30 según el
     checkpoint publicado) redimensionados a 512x512. Este wrapper acepta lotes
-    parciales (rellena repitiendo el último frame, como hace infer_mp4.py del
-    propio repo) y devuelve las cajas reescaladas al tamaño original del frame.
+    parciales (rellena repitiendo el último frame) y devuelve las cajas reescaladas al tamaño original del frame.
 
     Args:
         repo_dir: raíz del repo SoccerMaster (contiene models/, configs/, ...).

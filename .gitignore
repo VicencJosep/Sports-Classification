@@ -13,10 +13,6 @@ output/
 # contiene las COOKIES DE SESIÓN de Google. Nunca se versiona.
 automation/chrome_session/
 
-basketball/inputs
-basketball/outputs
-basketball/models
-
 # ground_truth/: los JSON de verdad (*.gt.json, highlights_goals.json) van a git; vídeos y cachés no.
 ground_truth/*
 !ground_truth/*.gt.json
@@ -30,8 +26,9 @@ models/homography/
 
 # ------------------------------------------------------------------ #
 # Soccer_Master: repo de terceros vendorizado. Se ignora todo salvo los
-# ficheros que hemos modificado/añadido nosotros (ver README § "Cambios
-# sobre el repositorio original Soccer_Master" para el detalle de cada uno).
+# ficheros que hemos modificado/añadido nosotros (ver
+# docs/dependencias_y_problemas.md § "Inventario de cambios sobre el
+# Soccer_Master original" para el detalle de cada uno).
 #
 # OJO con la sintaxis: "Soccer_Master/" (con barra, sin *) ignoraría el
 # directorio entero y las excepciones de abajo NO harían nada — git no
@@ -43,9 +40,6 @@ Soccer_Master/*
 !Soccer_Master/SoccerMaster/
 
 Soccer_Master/SoccerMaster/*
-!Soccer_Master/SoccerMaster/infer_mp4.py
-!Soccer_Master/SoccerMaster/eval_captions.py
-!Soccer_Master/SoccerMaster/eval_classification_head.py
 !Soccer_Master/SoccerMaster/models/
 
 Soccer_Master/SoccerMaster/models/*
