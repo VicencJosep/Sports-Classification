@@ -51,6 +51,7 @@ class HighlightClip(BaseModel):
     vlm_rank: int | None = None
     goal_source: str | None = None      # por qué es gol: scoreboard | restart | vlm+restart | fusion | celebration+audio;
                                         # "fusion" y "celebration+audio" son goles PROBABLES (título "Gol probable")
+    soccerhigh_score: float | None = None   # confianza de SoccerHigh (VideoMAEv2) en la jugada, 0-1
     content_url: str | None             # None si el clip no se recortó
 
 
@@ -67,6 +68,8 @@ class HighlightsResponse(BaseModel):
     vlm_used: bool = False              # False: el VLM no estaba disponible y la selección es solo por reglas
     vlm_degraded: bool = False          # True: alguna llamada al VLM falló a mitad (jugadas sin veredicto)
     vjepa_used: bool = False
+    soccerhigh_used: bool = False       # tramos de SoccerHigh (VideoMAEv2-Giant + transformer) en la selección
+    n_soccerhigh_segments: int = 0
     scoreboard_available: bool | None = None   # None: no se intentó leer el rótulo
     n_scoreboard_changes: int = 0
     n_candidates: int = 0

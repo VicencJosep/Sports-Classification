@@ -385,8 +385,15 @@ def rank_candidates(client: VLMClient, items: list[dict]) -> dict:
             f"shot_prob={it['shot']:.2f}, goal_prob={it['goal']:.2f}, crowd=+{it['audio']:.0f} dB, "
             f"passes={it['passes']:.0f}, carry_m={it['carry_m']:.0f}; after: {it.get('after', '')}]"
         )
-    text = client.chat(_RANK_PROMPT.format(candidates="\n".join(lines)), [], max_tokens=900)
+    # ~35 tokens por fila: con 30 candidatos (SoccerHigh amplía la red de seguridad) 900 no llegaban y el JSON
+    # salía cortado; además, si aun así se corta, se aprovechan las filas completas.
+    text = client.chat(_RANK_PROMPT.format(candidates="\n".join(lines)), [], max_tokens=max(900, 250 + 45 * len(items)))
     out = extract_json(text)
+    if not out.get("ranking"):
+        rows = [{"id": m.group(1), "rank": int(m.group(2)), "reason": m.group(3)}
+                for m in re.finditer(r'\{\s*"id"\s*:\s*"([^"]+)"\s*,\s*"rank"\s*:\s*(\d+)\s*,\s*"reason"\s*:\s*"([^"]*)"\s*\}', text or "")]
+        if rows:
+            out = {"ranking": rows, "rejected": out.get("rejected") or []}
     rank: dict[str, int] = {}
     reasons: dict[str, str] = {}
     for k, row in enumerate(out.get("ranking") or [], start=1):

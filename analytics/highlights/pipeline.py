@@ -19,12 +19,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
+import numpy as np
+
 from config import HighlightsConfig
 
 from .candidates import Candidate, build_candidates, make_goal_candidate
 from .cut import cut_clip
 from .scoreboard import ScoreTimeline, build_timeline
-from .signals import MatchSignals, build_signals
+from .signals import MatchSignals, attach_soccerhigh, build_signals
+from .soccerhigh import BACKBONE_NAME, ensure_features, predict as soccerhigh_predict
+from .soccerhigh import SoccerHighSummarizer
 from .vjepa import VJ_FEATURES, VJEPAWindows, apply_vjepa, goal_fusion
 from .vlm import (
     PROMPT_VERSION,
@@ -165,8 +169,11 @@ def _goal_hint(f: dict[str, float], cfg: HighlightsConfig, audio_ok: bool) -> bo
 
 def vlm_candidates(cands: list[Candidate], cfg: HighlightsConfig, audio_ok: bool) -> list[Candidate]:
     """Los que ve el VLM: los mejores por reglas más la red de seguridad de
-    ``_goal_hint`` (un gol puede ir muy abajo por reglas)."""
-    return cands[: cfg.vlm_max_candidates] + [c for c in cands[cfg.vlm_max_candidates:] if _goal_hint(c.features, cfg, audio_ok)]
+    ``_goal_hint`` (un gol puede ir muy abajo por reglas) y los tramos que
+    SoccerHigh da por seguros."""
+    return cands[: cfg.vlm_max_candidates] + [
+        c for c in cands[cfg.vlm_max_candidates:]
+        if _goal_hint(c.features, cfg, audio_ok) or c.features.get("soccerhigh", 0.0) >= cfg.soccerhigh_vlm_min_score]
 
 
 def _restart_seen(f: dict[str, float]) -> bool:
@@ -443,6 +450,33 @@ def _merge_close(items: list[dict], gap_s: float, max_merged_s: Optional[float] 
 #  Generación
 # --------------------------------------------------------------------------- #
 
+def run_soccerhigh(video: Path, out_dir: Path, cfg: HighlightsConfig, stage, force: bool = False) -> dict:
+    """Tramos de SoccerHigh para el vídeo: rasgos VideoMAEv2 cacheados junto al vídeo, resultado en
+    ``out_dir/soccerhigh.json`` (+ ``soccerhigh_scores.npy``). Devuelve ``{"segments", "frame_scores", ...}``."""
+    report_path = out_dir / "soccerhigh.json"
+    scores_path = out_dir / "soccerhigh_scores.npy"
+    if report_path.exists() and scores_path.exists() and not force:
+        with open(report_path) as f:
+            report = json.load(f)
+        if report.get("checkpoint") == cfg.soccerhigh_checkpoint_path and report.get("threshold") == cfg.soccerhigh_threshold:
+            report["frame_scores"] = np.load(scores_path)
+            return report
+    feats = ensure_features(
+        video, cfg.soccerhigh_backbone_path, batch_size=cfg.soccerhigh_batch_size, force=force,
+        progress=lambda n, elapsed: stage("soccerhigh_features", done=n, total=None, elapsed_s=round(elapsed)))
+    model = SoccerHighSummarizer.from_checkpoint(cfg.soccerhigh_checkpoint_path)
+    segs, prob = soccerhigh_predict(model, feats, cfg.soccerhigh_threshold)
+    np.save(scores_path, prob.astype(np.float32))
+    report = {
+        "video": str(video), "backbone": BACKBONE_NAME, "checkpoint": cfg.soccerhigh_checkpoint_path,
+        "threshold": cfg.soccerhigh_threshold, "n_frames": int(len(prob)),
+        "segments": [sg.to_dict() for sg in segs], "total_s": round(sum(sg.n_frames for sg in segs) / 2, 1),
+    }
+    _write_json(report_path, report)
+    report["frame_scores"] = prob
+    return report
+
+
 def generate_highlights(
     inputs: HighlightInputs,
     out_dir: Path,
@@ -452,11 +486,13 @@ def generate_highlights(
     cut: bool = True,
     force: bool = False,
     progress: Optional[Callable[[str], None]] = None,
+    use_soccerhigh: Optional[bool] = None,
 ) -> dict:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     use_vlm = cfg.vlm_enabled if use_vlm is None else use_vlm
     use_vjepa = cfg.vjepa_enabled if use_vjepa is None else use_vjepa
+    use_soccerhigh = cfg.soccerhigh_enabled if use_soccerhigh is None else use_soccerhigh
 
     def stage(name: str, **extra) -> None:
         _set_status(out_dir, name, **extra)
@@ -473,6 +509,24 @@ def generate_highlights(
         sig = build_signals(inputs.video, inputs.telemetry, inputs.teams, inputs.tdeed_scores,
                             inputs.possession, inputs.tracks_2d)
         sig.save(signals_path)
+
+    # 1b. SoccerHigh: tramos "de resumen" con su confianza (modelo de MMSports 2025 sobre VideoMAEv2-Giant)
+    soccerhigh_info: dict = {"used": False}
+    if use_soccerhigh:
+        try:
+            stage("soccerhigh")
+            sh = run_soccerhigh(inputs.video, out_dir, cfg, stage, force=force)
+            attach_soccerhigh(sig, sh["frame_scores"], sh["segments"])
+            sig.save(signals_path)
+            soccerhigh_info = {"used": True, "backbone": sh["backbone"], "checkpoint": sh["checkpoint"],
+                               "n_segments": len(sh["segments"]), "total_s": sh["total_s"], "threshold": sh["threshold"]}
+            logger.info("SoccerHigh: %d tramos (%.0f s); mejores: %s", len(sh["segments"]), sh["total_s"],
+                        [(hms(x["start_s"]), hms(x["end_s"]), x["score"]) for x in sorted(sh["segments"], key=lambda x: -x["score"])[:5]])
+        except Exception:                      # pesos o GPU no disponibles: se sigue sin él
+            logger.exception("SoccerHigh no disponible: selección sin sus tramos")
+    elif sig.soccerhigh_segments or "soccerhigh" in sig.curves:
+        sig.curves.pop("soccerhigh", None)
+        sig.soccerhigh_segments = []
 
     # 2. Candidatos (siempre se recalculan: es barato y depende de los pesos)
     stage("candidates")
@@ -665,6 +719,7 @@ def generate_highlights(
             "score": score, "goal_fusion": (round(gf, 3) if (gf := goal_fusion(judge, c.features)) is not None else None),
             "vjepa": {k2: round(c.features[k2], 3) for k2 in VJ_FEATURES if k2 in c.features} or None,
             "candidate_id": c.id, "merged_from": item.get("merged_from"), "sources": c.sources,
+            "soccerhigh_score": (round(c.features["soccerhigh"], 3) if soccerhigh_info["used"] and "soccerhigh" in c.features else None),
             "goal_s": (round(item["goal_s"], 2) if item.get("goal_s") is not None else None),
             "before_fit": item.get("before_fit"),
         })
@@ -681,6 +736,7 @@ def generate_highlights(
         "has_audio": sig.has_audio, "audio_informative": audio_informative(sig), "n_candidates": len(cands),
         "scoreboard": timeline.to_dict() if timeline is not None else None,
         "vjepa": {"used": vjepa_used},
+        "soccerhigh": soccerhigh_info,
         "highlights": results,
         "candidates": [c.to_dict() | {"vlm_score": vlm_score(judges.get(c.id, {})),
                                       "vlm_rank": (ranking or {}).get("rank", {}).get(c.id)} for c in cands],

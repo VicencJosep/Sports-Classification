@@ -2,9 +2,12 @@
 guardadas (``detect_mot.py`` o el oráculo del GT) y escribe tracks MOT.
 
 Trackers:
-* ``ours``: el ``core.tracking.PlayerTracker`` de producción, tal cual (mismos
-  filtros, ByteTrack de supervision y balón por frame), alimentado por un
-  detector que lee de la caché. Solo cambia de dónde salen las cajas.
+* ``ours``: el ``core.tracking.PlayerTracker`` de producción con sus valores por
+  defecto (mismos filtros y balón por frame), alimentado por un detector que
+  lee de la caché. Solo cambia de dónde salen las cajas. Variantes explícitas:
+  ``ours_bytetrack`` (supervision, el tracker anterior), ``ours_botsort`` (GMC,
+  sin ReID), ``ours_botsort_osnet`` y ``ours_botsort_prtreid`` (GMC + ReID).
+  Las variantes BoT-SORT leen los JPG de la secuencia (GMC y ReID miran píxeles).
 * ``ul_bytetrack`` / ``ul_botsort``: los trackers de ultralytics con sus YAML
   por defecto (BoT-SORT con GMC sparseOptFlow, sin ReID) sobre las mismas
   detecciones; filtro de entrada en ``UL_MIN_CONF`` / ``UL_MIN_AREA``.
@@ -44,19 +47,21 @@ logger = logging.getLogger(__name__)
 class CachedDetector:
     """``core.tracking.Detector`` que devuelve detecciones MOT ya calculadas.
 
-    ``detect`` recibe como "frames" los números de frame (1-based): el tracker no
-    mira los píxeles, solo las cajas.
+    ``detect`` ignora el contenido de ``frames`` (imagen o número) y sirve las
+    cajas del frame ``self.frame_no`` (1-based), que ``track_ours`` fija antes
+    de cada llamada; con lotes de más de un frame, las de los consecutivos.
     """
 
     chunk_size = 1
 
     def __init__(self, rows: np.ndarray) -> None:
         self._by_frame = {int(f): rows[rows[:, 0] == f] for f in np.unique(rows[:, 0])} if len(rows) else {}
+        self.frame_no = 1
 
-    def detect(self, frames: Sequence[int]) -> list[sv.Detections]:
+    def detect(self, frames: Sequence) -> list[sv.Detections]:
         out = []
-        for frame_no in frames:
-            r = self._by_frame.get(int(frame_no))
+        for k in range(len(frames)):
+            r = self._by_frame.get(self.frame_no + k)
             if r is None or len(r) == 0:
                 out.append(_with_role_data(sv.Detections.empty(), [], []))
                 continue
@@ -68,12 +73,16 @@ class CachedDetector:
         return out
 
 
-def track_ours(dets: np.ndarray, info: dict, seq_dir: Path) -> list[tuple]:
-    tracker = PlayerTracker(CachedDetector(dets), frame_rate=info["frame_rate"])
+def track_ours(dets: np.ndarray, info: dict, seq_dir: Path, **tracker_kwargs) -> list[tuple]:
+    detector = CachedDetector(dets)
+    tracker = PlayerTracker(detector, frame_rate=info["frame_rate"], **tracker_kwargs)
     rows: list[tuple] = []
     for frame_no in range(1, info["length"] + 1):
-        # process_batch con el nº de frame como "frame": CachedDetector lo usa de clave.
-        (res,) = tracker.process_batch([frame_no], [frame_no], [frame_no / info["frame_rate"]])
+        detector.frame_no = frame_no
+        # BoT-SORT (GMC/ReID) necesita la imagen; ByteTrack solo mira cajas y recibe el nº de frame.
+        frame = (cv2.imread(str(info["img_dir"] / f"{frame_no:06d}{info['img_ext']}"))
+                 if tracker.needs_frames else frame_no)
+        (res,) = tracker.process_batch([frame], [frame_no], [frame_no / info["frame_rate"]])
         for t in res.tracks:
             x1, y1, x2, y2 = t.xyxy
             rows.append((frame_no, t.tracker_id, x1, y1, x2 - x1, y2 - y1, t.confidence, t.class_id,
@@ -130,8 +139,34 @@ def _track_ultralytics(kind: str, dets: np.ndarray, info: dict, seq_dir: Path) -
     return rows
 
 
+def _botsort(d, i, s, **kw):
+    """BoT-SORT con los parámetros base de las filas de §7.10 (buffer 30, NMS 0,7, puerta de IoU, apariencia 0,8)."""
+    base = dict(tracker="botsort", lost_track_buffer=30, nms_iou=0.7, reid_lost_without_gate=False, appearance_thresh=0.8)
+    base.update(kw)
+    return track_ours(d, i, s, **base)
+
+
 TRACKERS = {
-    "ours": track_ours,
+    "ours": track_ours,  # valores por defecto de PlayerTracker (= producción; hoy = ours_botsort_osnet_nms_buf60_lost95)
+    # Cada variante fija TODOS los parámetros que cambian entre filas de docs/comparativa_benchmark.md §7.10, para que
+    # sigan siendo reproducibles aunque cambien los valores por defecto de PlayerTracker.
+    "ours_bytetrack": lambda d, i, s: track_ours(d, i, s, tracker="bytetrack", lost_track_buffer=30),
+    "ours_botsort": lambda d, i, s: _botsort(d, i, s, reid="none", nms_iou=None),
+    "ours_botsort_osnet": lambda d, i, s: _botsort(d, i, s, reid="osnet", nms_iou=None),
+    "ours_botsort_prtreid": lambda d, i, s: _botsort(d, i, s, reid="prtreid", nms_iou=None),
+    # variantes del ajuste en el split de train
+    "ours_botsort_nms": lambda d, i, s: _botsort(d, i, s, reid="none"),
+    "ours_botsort_osnet_nms": lambda d, i, s: _botsort(d, i, s, reid="osnet"),
+    "ours_botsort_osnet_nms_buf60": lambda d, i, s: _botsort(d, i, s, reid="osnet", lost_track_buffer=72),
+    "ours_botsort_osnet_nms_lost": lambda d, i, s: _botsort(d, i, s, reid="osnet", reid_lost_without_gate=True),
+    "ours_botsort_osnet_nms_buf60_lost": lambda d, i, s: _botsort(d, i, s, reid="osnet", lost_track_buffer=72,
+                                                                  reid_lost_without_gate=True),
+    "ours_botsort_osnet_nms_buf125_lost": lambda d, i, s: _botsort(d, i, s, reid="osnet", lost_track_buffer=150,
+                                                                   reid_lost_without_gate=True),
+    "ours_botsort_osnet_nms_buf60_lost90": lambda d, i, s: _botsort(d, i, s, reid="osnet", lost_track_buffer=72,
+                                                                    reid_lost_without_gate=True, appearance_thresh=0.9),
+    "ours_botsort_osnet_nms_buf60_lost95": lambda d, i, s: _botsort(d, i, s, reid="osnet", lost_track_buffer=72,
+                                                                    reid_lost_without_gate=True, appearance_thresh=0.95),
     "ul_bytetrack": lambda d, i, s: _track_ultralytics("bytetrack", d, i, s),
     "ul_botsort": lambda d, i, s: _track_ultralytics("botsort", d, i, s),
 }

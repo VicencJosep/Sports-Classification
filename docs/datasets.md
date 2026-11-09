@@ -1,6 +1,6 @@
 # Datasets: los que usamos y los que existen fuera
 
-Documento de referencia, estado a 1 de noviembre de 2026.
+Documento de referencia, estado a 1 de noviembre de 2026 (entrada de FOOTPASS / SN-PCBAS-2026 revisada el 6 de noviembre).
 
 Responde a dos preguntas: qué conjuntos de datos usa hoy cada rama y funcionalidad de Sports-Classification, y qué otros conjuntos públicos de fútbol (y, de forma secundaria, de baloncesto) podemos usar ya o nos pueden servir más adelante. Las particiones train/val/eval no se repiten aquí: la referencia sigue siendo `docs/particion_datasets.md`. Las licencias se citan de forma literal cuando la fuente las da; cuando un dato no se pudo comprobar se dice "no verificado". Los enlaces de cada dataset van en el cuerpo; la lista completa de fuentes está en la sección 9.
 
@@ -16,7 +16,7 @@ Usar ya, por orden de prioridad:
 6. **TeamTrack**: 60 min de fútbol con ojo de pez 8K fijo y dron 4K anotados por completo (Kaggle, licencia "MIT"). Rama panorámica: segundo partido para el detector de balón y la cámara virtual. Esfuerzo: medio (corregir la distorsión, generar la cámara virtual).
 7. **Fuentes abiertas de goles al minuto** (Transfermarkt datasets CC0, football-data.co.uk, Understat, Kaggle Football Events): verdad de goles, tiros y recuentos para los ~380 partidos sin asignar de SoccerNet-v2. Funcionalidad: highlights sin marcador, lector de marcador. Esfuerzo: bajo. Licencia: CC0 en Transfermarkt; el resto no verificada o scraping.
 
-Guardar para después: FOOTPASS/SN-PCBAS-2026 (jugador ejecutor por dorsal, 236 GB, NDA), Spiideo SynLoc (cámara fija 4K con posición métrica, licencia por pedir), SoccerSynth-Detection (Apache-2.0), MultiSports, SoccerReplay-1988, GOAL+MOMENTS, SoccerBench y otros benchmarks de VLM, SJN-210k, Kinetics "shooting goal (soccer)", ISSIA/ISSIA-3D, Alfheim, Fu et al. 2023, IDSSE/Metrica/PFF (validar métricas tácticas), SoccerTrack v1, SportsMOT.
+Guardar para después: FOOTPASS/SN-PCBAS-2026 (jugador ejecutor por dorsal; 28,5 GB en 352x640 + datos tácticos o 236 GB con Full HD; NDA), Spiideo SynLoc (cámara fija 4K con posición métrica, licencia por pedir), SoccerSynth-Detection (Apache-2.0), MultiSports, SoccerReplay-1988, GOAL+MOMENTS, SoccerBench y otros benchmarks de VLM, SJN-210k, Kinetics "shooting goal (soccer)", ISSIA/ISSIA-3D, Alfheim, Fu et al. 2023, IDSSE/Metrica/PFF (validar métricas tácticas), SoccerTrack v1, SportsMOT.
 
 Descartar o de poco valor: DFL Bundesliga Data Shootout, DeepSportradar (para fútbol), SkillCorner y Wyscout (sin vídeo y sin solape con nuestros partidos), Last Row, Signality, los derivados Roboflow del DFL Shootout, SoccerDB y SSET (sin descarga verificable).
 
@@ -63,7 +63,7 @@ Benchmark de resumen automático (Díaz-Juan, Ballester, Haro, Universitat Pompe
 | Licencia | "This dataset is licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) license." |
 | Ejemplo (nuestro Clásico 2017-04-23) | 21 segmentos, `summaryLength` 01:55, resumen en YouTube `aFCO6WidGVM` |
 
-Los timestamps se refieren a los `*_HQ.mkv` de SoccerNet; con nuestros 720p hay que aplicar el desfase de `video.ini` antes de comparar. Es la verdad de highlights que faltaba (`docs/highlights_evaluacion.md` solo tiene goles y un clip de referencia); los 45 de test dan un benchmark comparable con el baseline. Como es NC, debe quedar como conjunto de evaluación, no de entrenamiento del producto.
+Los timestamps se refieren a los `*_HQ.mkv` de SoccerNet; con nuestros 720p hay que aplicar el desfase de `video.ini` antes de comparar. **Estado 2026-11-02**: anotaciones y listas en `datasets/soccerhigh/`, features Giant de los 45 de test y del Clásico bajadas con `scripts/soccerhigh_download.py`, baseline reproducido y modelo integrado en el pipeline (`docs/highlights_soccerhigh.md`); el desfase se estima alineando rasgos (`scripts/soccerhigh_align.py`) porque `video.ini` exige la contraseña de SoccerNet. Es la verdad de highlights que faltaba (`docs/highlights_evaluacion.md` solo tiene goles y un clip de referencia); los 45 de test dan un benchmark comparable con el baseline. Como es NC, debe quedar como conjunto de evaluación, no de entrenamiento del producto.
 
 ### 2.3 StatsBomb Open Data
 
@@ -301,13 +301,19 @@ Nota sobre el acceso a SoccerNet en 2026: la distribución se ha migrado a Huggi
 
 ### 4B. Útil en el futuro
 
-**FOOTPASS / SN-PCBAS-2026, Player-Centric Ball Action Spotting (2025-2026, Footovision / Mines Paris)**, [github.com/JeremieOchin/FOOTPASS](https://github.com/JeremieOchin/FOOTPASS), [arXiv 2511.16183](https://arxiv.org/html/2511.16183), HF `SoccerNet/SN-PCBAS-2026` (236 GB, gated).
-- Qué contiene: 54 partidos completos 2023/24 (Ligue 1, Bundesliga, Serie A, La Liga, UCL; 50 equipos), broadcast 1920x1080 a 25 fps; 102.992 eventos en 8 clases (Drive, Pass, Cross, Shot, Header, Throw-in, Tackle, Block) como tuplas (frame, team left/right, dorsal, clase); tracklets por jugador, posiciones y velocidades en el campo, 13 roles tácticos. Splits 48 / 3 / 3 partidos.
-- Métrica y resultados: Macro F1 a τ = 0,15 con ±12 frames (clase + equipo + dorsal correctos); baseline TAAD+DST 46,41 en el challenge (67,5 % en el paper); ganador 2026 (PAVE) 58,94.
-- Licencia: README "Dataset annotations & baselines released under CC BY-NC 4.0." y "Redistribution of SoccerNet broadcast videos is prohibited under the NDA."; el fichero LICENSE del repo es Apache-2.0 (discrepancia).
-- Solape: ninguno (temporada 2023/24).
-- Veredicto: útil en el futuro, cuando se ataque la atribución de jugador. Funcionalidad: eventos con equipo y jugador en `main`; tracklets para supervisar el tracking. Es el único dataset de SoccerNet con jugador ejecutor sobre partidos completos.
-- Para usarlo: cuenta HF + NDA, 236 GB de disco, baselines TAAD/TAAD+DST públicos.
+**FOOTPASS / SN-PCBAS-2026, Player-Centric Ball Action Spotting (2025-2026, Footovision / Mines Paris)**, [github.com/JeremieOchin/FOOTPASS](https://github.com/JeremieOchin/FOOTPASS), [arXiv 2511.16183](https://arxiv.org/html/2511.16183), [CVIU 269 (2026) 104790](https://doi.org/10.1016/j.cviu.2026.104790), HF [`SoccerNet/SN-PCBAS-2026`](https://huggingface.co/datasets/SoccerNet/SN-PCBAS-2026) (236 GB, gated). Entrada revisada el 2026-11-06.
+- Son el mismo dataset con dos nombres. FOOTPASS ("Footovision Play-by-Play Action Spotting in Soccer") es el nombre del dataset, del paper (preprint HAL hal-05373478 de septiembre de 2025, arXiv de noviembre de 2025, CVIU vol. 269, junio de 2026) y del devkit de GitHub (baselines, `evaluation.py`, etiquetas públicas). SN-PCBAS-2026 es el nombre del repositorio de Hugging Face de la organización SoccerNet que distribuye vídeos y datos tácticos (creado el 2025-10-02) y de la tarea "Player-Centric Ball Action Spotting" del reto SoccerNet 2026 (patrocinada por Footovision con 1.000 USD, abierta hasta el 2026-04-24). El README de FOOTPASS remite a ese repositorio para descargar y la página del reto remite a FOOTPASS como devkit; no hay otra distribución.
+- Qué contiene: 54 partidos completos 2023/24 (Ligue 1, Bundesliga, Serie A, La Liga, UCL; 50 equipos), broadcast nativo 1920x1080 a 25 fps; 102.992 eventos en 8 clases (Pass 49,9 %, Drive 39,0 %, Header 4 %, Cross 2,3 %, Throw-in 1,9 %, Block 1,4 %, Shot 1,2 %, Tackle 0,3 %) como tuplas (frame, team 0 izquierda / 1 derecha, dorsal, clase), anclados a un solo frame, anotados también en repeticiones y primeros planos; el 81,5 % tiene caja visible. Datos tácticos por jugador y frame en HDF5 con 14 columnas (`FRAME, PLAYER_ID, LEFT_TO_RIGHT, SHIRT_NUMBER, ROLE_ID, X_POS, Y_POS, X_SPEED, Y_SPEED, ROI_X, ROI_Y, ROI_WIDTH, ROI_HEIGHT, CLS`): tracklet (caja en coordenadas 1920x1080, NaN cuando el jugador no se ve), posición y velocidad en el campo, equipo, dorsal y uno de 13 roles tácticos (Goalkeeper; Left, Left Central, Mid Central y Right Central Back; Right Back; Left y Right Midfielder; Defensive y Attacking Midfielder; Left y Right Winger; Central Forward). Los ganadores del reto trabajan con 26 huecos de rol (13 por equipo). Los eventos los anotó un equipo profesional con software propio; el tracking, los dorsales y las trayectorias de los jugadores no visibles salen de un pipeline automático con imputación (no consta verificación humana); los roles, de trayectorias + clustering + anotación experta.
+- Diferencias entre el paper y la distribución del reto:
+  1. Particiones. El paper divide 48 / 3 / 3 partidos (train 91.327, validación 6.070 y test 5.595 eventos; el test son los partidos 0, 36 y 50). Hugging Face publica `TRAIN`, `VAL` y `CHALLENGE`, sin `TEST`: el test del paper es el conjunto *challenge* (el README lo llama "Challenge/Test"), con verdad oculta y evaluación en Codabench; las etiquetas públicas del devkit (`playbyplay_train.json`, `playbyplay_val.json`) cubren 51 partidos. Codabench tiene dos servidores, "test" (11249) y "challenge" (11232); qué partidos evalúa el primero no se pudo verificar (un participante calibra umbrales con etiquetas de su "test", así que no es el conjunto oculto; probablemente la validación).
+  2. Métrica. El paper da F1 global (micro) a τ = 0,15 y ±12 frames más F1 y AP de 11 puntos por clase: TAAD 35,9, TAAD+GNN 52,1, TAAD+DST 67,5 en su test. El reto puntúa Macro-F1 (media de las 8 clases, con clase, equipo y dorsal correctos): el mismo TAAD+DST sobre los mismos partidos da 46,41 (la media de sus F1 por clase del paper es 46,4; tackle 0,0 y block 18,0 hunden la media). Ganador 2026 (PAVE, TAHAKOM) 58,94; 2.º 56,40; 3.º 55,69; 6 equipos y 124 envíos.
+  3. Resoluciones. El paper describe Full HD y entrena a 352x640. Hugging Face trae las dos: `videos_fullHD_*` (207,2 GB en 7 zips) y `videos_352x640_*` (25,7 GB), más `tactical_data_*` (2,8 GB). Para reproducir los baselines bastan 28,5 GB.
+  4. Unidad. Las anotaciones y los datos tácticos van por mitad (`game_18_H1`, `game_18_H2`); por eso PAVE habla de 96 "partidos" de entrenamiento y 6 de validación.
+  5. Índices de clase. El código usa 9 (0 fondo + drive, pass, cross, throw-in, shot, header, tackle, block); el "0 a 9" del paper es una errata.
+- Licencia: paper CVIU en acceso abierto CC BY 4.0 (Crossref); README "Dataset annotations & baselines released under CC BY-NC 4.0." y "Redistribution of SoccerNet broadcast videos is prohibited under the NDA."; fichero LICENSE del repo Apache-2.0 (discrepancia sin resolver); HF `license: other` enlazando el NDA de SoccerNet (formulario con nombre, afiliación y planes de uso, aprobación manual, NDA personal por correo).
+- Solape: ninguno (temporada 2023/24; nuestros EFL son 2019/20 y SoccerNet-v2 2014-17).
+- Veredicto: útil en el futuro, cuando se ataque la atribución de jugador. Funcionalidad: eventos con equipo y jugador en `main`; tracklets para supervisar el tracking. Es el único dataset de SoccerNet con jugador ejecutor sobre partidos completos. Nuestra cadena actual (T-DEED para la clase + sn-teamspotting para el equipo + dorsal por tracklet) se podría medir con su `evaluation.py` sobre los 3 partidos de validación (`docs/comparativa_benchmark.md` §7.7).
+- Para usarlo: cuenta HF + NDA, 28,5 GB (352x640 + tácticos) o 236 GB (Full HD), baselines TAAD / TAAD+GNN / TAAD+DST públicos sin pesos; Codabench 11232 para el challenge.
 
 **Spiideo SoccerNet SynLoc (2025, Spiideo + SoccerNet; VISAPP 2025 y reto 2026)**, [github.com/Spiideo/sskit](https://github.com/Spiideo/sskit), resultados en [arXiv 2607.07320](https://arxiv.org/html/2607.07320v1).
 - Qué contiene: imágenes 4K (y versión fullhd) de 17 instalaciones reales con 2 cámaras fijas por campo (cada una cubre medio campo), con atletas 3D sintéticos (BEDLAM, 683 HDRI) renderizados sobre fondos reales; train 42.504, validación 6.777, test 9.309, challenge 11.352 imágenes; 1.107.009 humanos anotados. COCO con caja, keypoints 2D/3D de pelvis y punto de apoyo, `position_on_pitch` en metros, articulaciones SMPL-X y calibración por imagen (`camera_matrix`, `dist_poly`). Sin balón, sin eventos, sin vídeo continuo.
@@ -511,7 +517,7 @@ Lo que no existe en baloncesto: ningún dataset público con jugadores + balón 
 | SN-GSR-2024/2025, SN-Depth-2025, SN-MVFouls-2024/2025 | GPL-3.0 (etiqueta HF) | Ambiguo | licencia de software aplicada a datos; alcance sobre modelos sin resolver |
 | SN-VQA-2026 | CC BY-SA 4.0 | Sí, con share-alike | |
 | SoccerNet-v3 | "open licence", "no restriction whatsoever" | Sí (las anotaciones) | frames de vídeo bajo NDA |
-| FOOTPASS / SN-PCBAS-2026 (anotaciones) | CC BY-NC 4.0 (README); LICENSE del repo Apache-2.0 | No | vídeo bajo NDA |
+| FOOTPASS / SN-PCBAS-2026 (anotaciones) | CC BY-NC 4.0 (README); LICENSE del repo Apache-2.0; paper CVIU CC BY 4.0 | No | vídeo bajo NDA, en HF a 352x640 y Full HD |
 | SoccerTrack v2 | CC BY 4.0 | Sí, con atribución y cita | la única licencia explícita en disco; acceso HF restringido |
 | TeamTrack | Kaggle "MIT" | En principio sí | confirmar por escrito con los autores |
 | SoccerTrack v1 | Kaggle "GNU Lesser General Public License 3.0" | Atípica | licencia de software sobre datos |
@@ -562,7 +568,7 @@ Plan para el usuario; aquí no se ha ejecutado nada. El esfuerzo es una estimaci
 9. **Documentar licencias y generadores.** Guardar en el repo el texto del NDA y del formulario de HF, anotar la licencia de cada dataset de `datasets/` (hoy solo SoccerTrack v2 la tiene), corregir `docs/particion_datasets.md:20` (el montaje de `/mnt` sí está disponible en el host), y reescribir o documentar los generadores que faltan (`dataset_vjepa_backup`, `clips_analisis`, descarga de Tracking y de `/mnt`, origen de los 28 clips de tiro). Esfuerzo: medio día.
 10. **Consultar asesoría legal** sobre los pesos entrenados con vídeo bajo NDA (T-DEED, `SNB_pano1`, SVC, R3D-18) y sobre la GPL-3.0 de T-DEED antes de distribuir el producto. Esfuerzo: externo.
 11. **Anotar lo que ningún dataset externo cubre**: elegir y anotar los dos juveniles de evaluación (eventos con equipo y jugador, plantilla de eventos pendiente) y 300-500 frames de balón de YouTube como test real del detector de TV. Hueco: dominio del producto. Esfuerzo: 1-2 semanas de anotación.
-12. **Cuando se ataque la atribución de jugador**, pedir `SoccerNet/SN-PCBAS-2026` (FOOTPASS, 236 GB, NDA + CC BY-NC 4.0) y reutilizar sus baselines TAAD+DST; y como laboratorio de métricas tácticas, cargar IDSSE y Metrica con kloppy para fijar rangos de sanidad de posesión, velocidades y mapas de calor. Esfuerzo: 1 semana cada uno.
+12. **Cuando se ataque la atribución de jugador**, pedir `SoccerNet/SN-PCBAS-2026` (FOOTPASS; 28,5 GB en 352x640 + datos tácticos o 236 GB con Full HD; NDA + CC BY-NC 4.0) y reutilizar sus baselines TAAD+DST; y como laboratorio de métricas tácticas, cargar IDSSE y Metrica con kloppy para fijar rangos de sanidad de posesión, velocidades y mapas de calor. Esfuerzo: 1 semana cada uno.
 
 ## 8. Huecos de esta investigación
 
@@ -688,10 +694,10 @@ Notas de investigación de las que procede este documento (2026-11-01): `output/
 
 ### Sección 4B (útil en el futuro)
 
-90. FOOTPASS: https://github.com/JeremieOchin/FOOTPASS y LICENSE https://raw.githubusercontent.com/JeremieOchin/FOOTPASS/main/LICENSE
-91. FOOTPASS, paper: https://arxiv.org/html/2511.16183
-92. SN-PCBAS-2026 (HF): https://huggingface.co/datasets/SoccerNet/SN-PCBAS-2026
-93. SoccerNet 2026, resultados: https://arxiv.org/html/2607.07320v1
+90. FOOTPASS: https://github.com/JeremieOchin/FOOTPASS, LICENSE https://raw.githubusercontent.com/JeremieOchin/FOOTPASS/main/LICENSE, árbol https://api.github.com/repos/JeremieOchin/FOOTPASS/git/trees/main?recursive=1, `evaluation.py` https://raw.githubusercontent.com/JeremieOchin/FOOTPASS/main/evaluation.py y `utils/TAAD_Dataset.py` https://raw.githubusercontent.com/JeremieOchin/FOOTPASS/main/utils/TAAD_Dataset.py
+91. FOOTPASS, paper: https://arxiv.org/html/2511.16183; CVIU https://doi.org/10.1016/j.cviu.2026.104790 (licencia vía Crossref https://api.crossref.org/works/10.1016/j.cviu.2026.104790); preprint HAL https://hal.science/hal-05373478v1
+92. SN-PCBAS-2026 (HF): https://huggingface.co/datasets/SoccerNet/SN-PCBAS-2026; API https://huggingface.co/api/datasets/SoccerNet/SN-PCBAS-2026; árbol con tamaños https://huggingface.co/api/datasets/SoccerNet/SN-PCBAS-2026/tree/main
+93. SoccerNet 2026, resultados: https://arxiv.org/html/2607.07320v1; página del reto https://www.soccer-net.org/challenges/2026; Codabench https://www.codabench.org/competitions/11232/ (challenge) y https://www.codabench.org/competitions/11249/ (test); PAVE https://arxiv.org/abs/2606.28389; extensiones de los baselines https://arxiv.org/abs/2606.09679; ME-DST https://arxiv.org/abs/2608.01696
 94. Spiideo sskit: https://github.com/Spiideo/sskit y https://api.github.com/repos/Spiideo/sskit
 95. SynLoc, VISAPP 2025: https://scitepress.org/publishedPapers/2025/131082/pdf/index.html
 96. SoccerSynth-Detection: https://github.com/open-starlab/SoccerSynth-Detection y https://arxiv.org/html/2501.09281v1

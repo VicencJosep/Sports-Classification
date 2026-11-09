@@ -55,6 +55,7 @@ en el contenedor (copiar al proyecto).
 | ☑ | **Lector del CSV de anotación** (`tiempo,etiqueta,dorsal(=tracker_id),equipo`, filas en blanco y marcas `---` ignoradas) y plantilla de eventos | Hecho 2026-10-21 (`scripts/annotation_csv.py`, avisa de equipos/etiquetas ilegibles con nº de línea); Espanyol 25-30 medido | 0,5 d | A |
 | ☑ | **Partición de juveniles** en `docs/particion_datasets.md` §6 (Mallorca, Espanyol = validación; 2 nuevos = evaluación) + §4 SoccerNet Tracking (el detector `yolo11s_snt_ball.pt` ya se entrenó con él) + Clásico declarado in-sample para T-DEED | Hecho 2026-10-21 | 1 h | — |
 | ☑ | Decisión sobre `foul` (estimado / fuera) | Hecho 2026-10-21: marcado `estimated` (config + telemetría + API); falta pintarlo en el panel | 10 min | Existente |
+| ☑ | **Tracker BoT-SORT con GMC y ReID en `main`** (sustituye a ByteTrack; `tracker="bytetrack"` sigue como opción) | Hecho 2026-11-06: test de SoccerNet-Tracking con las mismas cajas HOTA 56,4 → 59,4, IDF1 66,0 → 70,5, IDSW −14 % (la GMC sola −27 %, concentrado en paneos); reentradas 1 → 30 de 720; pipeline ~28 → ~15 fps (`docs/comparativa_benchmark.md` §7.10) | 1 d | B |
 | ☐ | **Equipo y jugador en los eventos**: `EventSpan` con frame del pico, tracker y equipo del poseedor; re-etiquetar como `shot` la acción ±0,5 s bajo cada SHOT/GOAL emitido (no meter SHOT en `BALL_ACTION_LABELS`: el NMS y el umbral de acciones lo pisarían); `shot` en arnés, adaptador y vocabulario del frontend | telemetry.json de los 4 partidos con `team`/`tracker_id` en eventos; exactitud de equipo informada | 2 d | Existente |
 | ☐ | **Curva GOAL**: barrido de GOAL y de "Goal" (cabeza SoccerNet) con lector Labels-ball en `tune_tdeed_event_thresholds.py` sobre `_test` (7 goles limpios EFL) y `challenge2` en los 10 SN-v2 (25 goles, in-sample) y el Clásico (5) | Tabla en estudio §12, aunque sea negativa (esperable [H]: mantener 0,3 y confiar el gol al marcador/saque de centro) | 0,5 d | Existente |
 | ☐ | **Clásico como GT de TV**: alinear `Labels-v2.json` de SoccerNet (5 Goal, 20 tiros, 10 Corner, 18 Foul, 29 Throw-in) con el vídeo de YouTube (desfases ~359 s y ~3.554 s [M, preliminar]) y medir córner/falta/tiro/banda. In-sample para T-DEED: cifras optimistas, pero es la única verdad de córner y falta en TV | Informe por evento del Clásico | 0,5 d | Existente |
@@ -331,3 +332,66 @@ afinado (68,1 → 77,1 %) es un artefacto: cambian las parejas emparejadas, no `
   8a56011 (duración de clips). Más tarde la GPU se liberó y la cadena §3.6 corrió sola (52 min): `SNB_pano1` ve los 3 goles
   del Mallorca como tiro (> 0,4) pero hunde la EFL (tiros −11 pt, header desaparece, cabeza SN sin "Goal"); `SNB_tv1` queda
   condicionado a mezclar EFL en cada lote y a tener tiros anotados en juveniles (tabla en §3.6).
+- **2026-11-02** (sesión desatendida): **modelo de SoccerHigh portado e integrado** (`docs/highlights_soccerhigh.md`).
+  VideoMAEv2-Giant K710 + resumidor DSNet-AF en torch puro (`analytics/highlights/soccerhigh.py`, `videomaev2.py`); baseline
+  reproducido con sus rasgos (45 test: F1 0,412 / F1@T 0,395 frente a 0,396 / 0,388) y con rasgos propios del 720p en 3 de
+  test (0,368 / 0,365 frente a 0,353 / 0,346 con los suyos); `video.ini` sustituido por alineación de rasgos
+  (`scripts/soccerhigh_align.py`, Clásico +968/+277 s, sin deriva). Clip = 16 fotogramas consecutivos a 2 fps (8 s), no a
+  ritmo nativo. En el pipeline: etapa `soccerhigh` (rasgos cacheados junto al vídeo, ~8 min/partido), anclas por tramo,
+  rasgo `soccerhigh` en reglas (peso 2,5), red de seguridad del VLM (≥ 0,75), `soccerhigh_score` en la API y badge en el
+  frontend. Los 4 partidos regenerados: 8/8 goles, 0 falsos, 21/21 en rango; SoccerHigh ve los 5 goles del Clásico (0,64-0,88)
+  y 2/3 del Mallorca, y nada en Espanyol ni Middlesbrough (sin goles). Contra la verdad de SoccerHigh en el Clásico (115 s de
+  resumen): tramos del modelo F1 0,316, clips del frontend 0,256 (la política de 12-45 s los hace largos frente a planos de
+  3-10 s). Arreglo de paso: el ranking del VLM se truncaba con ~30 candidatos (`rank_candidates`). Pendiente: afinar el
+  resumidor con rasgos propios (train de SoccerHigh + juveniles anotados) y medir el pipeline entero en más partidos de test.
+- **2026-11-06** (tracking, `main`): **ByteTrack sustituido por BoT-SORT** (ultralytics) en `core/tracking.py`: GMC
+  sparseOptFlow, NMS previo 0,7, ReID OSNet x1.0 (`core/osnet.py`, pesos "sports" sin licencia en `models/reid/`) o PRTReId,
+  cajas detectadas en vez de las del Kalman; `TrackingConfig` nuevo (`tracker`, `reid`, `nms_iou`, `lost_track_buffer=72`,
+  `reid_lost_without_gate`, `appearance_thresh=0.95`); tests `tests/test_tracking_botsort.py`. Arnés: `track_mot.py` con
+  variantes `ours_*`, `id_analysis.py` (IDSW por tercil de paneo, reentradas, fragmentación) y
+  `run_snmot_train_tuning.sh` (12 seq de train; el test se usó una vez por candidata). Resultado [M], test 49 seq, mismas
+  detecciones: ByteTrack 56,4 / 66,0 / 4.892 IDSW → GMC 57,5 / 67,0 / 3.565 (−32 % IDSW en el tercil con más paneo) →
+  GMC+NMS+OSNet+perdidos por apariencia 0,95 **59,4 / 70,5 / 4.199** (por defecto). Hallazgos: el ReID de BoT-SORT no
+  recupera reentradas (hueco mediano 4,4 s, 97 % por el borde; recupera 1-4 %, Deep-EIoU 15 %, GTA-Link offline 44 %); el
+  detector a conf 0,1 duplica el 12 % de cajas (el NMS quita 16 k FP); PRTReId como ReID 58,7 a 98 ms/frame, descartado.
+  Coste: tracker 0,8 → ~32 ms/frame (pipeline ~28 → ~15 fps; `reid="none"` ~20 fps). Pendiente: borrar la caché
+  `*.tracks.jsonl` y reanalizar los partidos de TV para ver el efecto en equipo/ejecutor con `evaluate_match.py`; enlace
+  offline tipo GTA-Link para las reentradas; licencia de los pesos OSNet antes de producto.
+- **2026-11-08** (estado del arte en tracking): `docs/estado_arte_tracking.md`, con 60+ papers verificados en arXiv por 4 agentes
+  (notas en `output/research_notes/tracking_sota_2026-11-08/`). Conclusiones: nuestros 59,4 HOTA están en la banda de
+  SoccerMaster+MOTIP (59,1) y YOLOv8+PRTReID (59,8); el hueco hasta SportsSUSHI/Kalisteo (71-76) es detector + enlace a largo plazo
+  con dorsal y equipo; la línea BIoU → EIoU (Deep-EIoU, ARC-SORT) es el siguiente escalón online; GTA-Link + dorsal/equipo para las
+  reentradas; UCMCTrack, pseudo-profundidad y end-to-end descartados para TV. Pasos en §5 del documento.
+- **2026-11-08** (benchmark de eventos, `docs/comparativa_benchmark.md` §7.11): tabla única de los spotters con pesos públicos
+  (T-DEED `SoccerNetBall_test` / `challenge2` / `SNB_pano1`, sn-teamspotting, AdaSpot-b/-s, E2E-Spot de OSL) en el test
+  oficial de SN-BAS (Stoke + Reading, 3.980 acciones; contaminación verificada en los splits de cada repo) y en la eval de
+  SoccerTrack v2 con dos cámaras virtuales: la que sigue el balón anotado (`vcam796`) y la nuestra (`vcam796vl1`). Runner
+  reanudable `scripts/benchmark/run_bas_views.sh`; `SNB_pano1` se carga ya desde `core.ball_spotting`. Resultado [M]: en TV
+  nadie supera a T-DEED (61,2 mAP@1); en panorámica la cámara ideal da lo mismo que la nuestra (±2 pt en los 7 modelos;
+  `SNB_pano1` 38,4 / 38,3), con +3 pt de mAP y +15 AP de tiros solo en 128057 (en 132831 la referencia está degradada): el
+  hueco TV → panorámica es de dominio, la cámara solo cuenta en tiros. Coste con GPU libre: 12-14× tiempo real de punta a
+  punta para todos los modelos a 796x448 (decodificación manda; el 800MF de producción solo +4 % en pared, 14 GB de VRAM).
+  Búsqueda SOTA: SoccerMaster, UniSoccer y sn-gamestate no hacen spotting; ganadores de 2025-26 sin pesos; lRomul 2023
+  solo PASS/DRIVE. Hallazgo colateral: T-DEED preentrenó solo con `train`+`val` de SoccerNet-v2, así que su `test` (100
+  partidos, en /mnt) está limpio para la cabeza de 17 eventos (y los 6 del benchmark de tiros están en él); corregido en
+  `docs/particion_datasets.md`. Decisión pendiente del usuario: piloto de 20 partidos de ese test (~3 h) o los 100 (~16 h).
+- **2026-11-09** (punto de trabajo y metraje nuevo, `docs/comparativa_benchmark.md` §7.12): el usuario preguntó qué eran los
+  porcentajes de las tablas (AP por clase a ±0,5 s, no precisión) y quién hace más falsos positivos. Nuevo
+  `scripts/benchmark/eval_prf.py` (umbral global óptimo por modelo, P/R/F1/TP/FP/FN por clase, emparejamiento ±0,5 s 1 a 1)
+  y tres tablas «AP · P/R · FP» para T-DEED 200MF, AdaSpot-b y AdaSpot-s: TV (SN-BAS test), panorámica (ST2 eval, nuestra
+  cámara) y **SN-PCBAS-2026/FOOTPASS val** (3 partidos de 2023/24 de otras ligas, 6.070 eventos de 8 clases, descargado con el
+  token del usuario; metraje nuevo para todos los modelos, también `challenge2`). Resultado [M]: en TV los tres emiten los
+  mismos FP (552-654) y T-DEED gana por recall en clases raras (F1 80,5 vs 78,2); en panorámica AdaSpot-b casi no emite y
+  AdaSpot-s es el más impreciso (1.688 FP); **en PCBAS T-DEED hace 2,3× más falsos positivos que AdaSpot-b** (2.600 vs 1.121,
+  casi todos conducciones y pases) y pierde más punto de trabajo (F1 80,5 → 64,0 frente a 78,2 → 71,5; umbral óptimo 0,70 →
+  0,20), aunque sigue ganando en mAP (50,0 vs 41,1) por tiro (59 vs 26), banda, centro y entrada. Lectura: T-DEED ordena mejor
+  pero calibra peor fuera de la EFL → recalibrar umbral por partido o entrenar con más ligas. Cabeza de 17 eventos de SN-v2 (§7.13, piloto de 20 partidos
+  limpios del test, evaluador oficial, `eval_snv2.py`): el 200MF da Average-mAP tight 21,4 / loose 25,8 frente a 62-73 de los
+  sistemas dedicados; acierta el instante (desfase mediano < 0,2 s) pero dispara de más; córner (P 81 / R 76), banda, balón
+  fuera y libre directo son utilizables con umbral propio; tiros flojos (el tiro debe salir de la cabeza de acciones); cambio,
+  amarilla, fuera de juego y penalti inservibles en el 200MF (nunca pasan de 0,3). Modelo de producción `challenge2` (medido la misma noche): en SN-v2
+  25,3 tight / 30,4 loose (+3,9; penalti 48 con 14 casos, tiro a puerta 33 frente a 20), mismas clases inservibles (tarjeta,
+  cambio, fuera de juego, saque inicial: no mostrarlas como fiables en `main`); en PCBAS mAP@1 53,1 y F1 65,2 con 2.136 FP
+  (umbral óptimo 0,25 frente a 0,55 en la EFL): también calibra mal fuera de la EFL, ~24 puntos menos de mAP que en
+  Middlesbrough. Vídeos temporales: 32 GB de SN-v2 en `datasets/SoccerNet/<liga>/` y 10,6 GB de zip en
+  `datasets/SoccerNet/pcbas-2026/raw/`, borrables cuando el usuario decida.

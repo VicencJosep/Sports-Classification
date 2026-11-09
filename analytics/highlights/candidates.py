@@ -89,6 +89,17 @@ def find_anchors(sig: MatchSignals, cfg: "HighlightsConfig") -> list[tuple[float
     for e in sig.events:
         if e["label"] in ("shot", "goal"):
             anchors.append((float(e["t_s"]), f"event:{e['label']}", float(e["score"])))
+    # Tramos de SoccerHigh (lo que un editor metería en el resumen): el momento clave es el pico de tiro dentro del
+    # tramo si lo hay; si no, el fotograma de más confianza del modelo.
+    sh = sig.curve("soccerhigh")
+    for seg in sig.soccerhigh_segments:
+        if seg["score"] < cfg.soccerhigh_anchor_min_score:
+            continue
+        w = sig.window(seg["start_s"] - 2.0, seg["end_s"])
+        j = w.start + int(np.argmax(shot[w]))
+        if shot[j] < 0.05:
+            j = w.start + int(np.argmax(sh[w]))
+        anchors.append((float(sig.t[j]), "soccerhigh", float(seg["score"])))
     anchors.sort()
     return anchors
 
@@ -169,6 +180,10 @@ def play_start(sig: MatchSignals, anchor_s: float, team: int, cfg: "HighlightsCo
 
 def provisional_end(sig: MatchSignals, anchor_s: float, cfg: "HighlightsConfig") -> float:
     end = anchor_s + cfg.post_default_s
+    # Un tramo de SoccerHigh que cubre el ancla dice hasta dónde seguiría el resumen (repetición, celebración).
+    for seg in sig.soccerhigh_segments:
+        if seg["start_s"] - 2.0 <= anchor_s <= seg["end_s"] and seg["score"] >= cfg.soccerhigh_anchor_min_score:
+            end = max(end, seg["end_s"])
     if sig.has_audio:
         # Alargar mientras dure la celebración (audio sostenido por encima
         # del fondo), con tope.
@@ -268,6 +283,7 @@ def compute_features(sig: MatchSignals, anchor_s: float, start_s: float, chain: 
         "n_players": float(len({a["tracker_id"] for a in chain})),
     }
     f["drive_m"], f["drive_s"] = _drive_metres(sig, start_s, anchor_s + 1.0)
+    f["soccerhigh"] = float(sig.curve("soccerhigh")[sig.window(start_s, anchor_s + 12.0)].max(initial=0.0))
     dists = [_dist_to_goal(xy) for b in range(*sig.window(anchor_s - 1.5, anchor_s + 0.5).indices(sig.n_bins))
              if (xy := _xy_at(sig, b)) is not None]
     f["dist_goal_m"] = float(min(dists)) if dists else float("nan")
@@ -296,6 +312,7 @@ def rule_score(f: dict[str, float], n_shots_60: int, cfg: "HighlightsConfig") ->
         + cfg.w_drive * min(f["drive_m"], 40.0)
         + cfg.w_burst * min(max(n_shots_60 - 1, 0), 3)
         + cfg.w_near_goal * near_goal
+        + cfg.w_soccerhigh * f.get("soccerhigh", 0.0)
     )
 
 

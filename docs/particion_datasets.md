@@ -29,9 +29,16 @@ Las listas largas están en `docs/particiones/*.txt`.
 Hechos que condicionan su uso:
 - Las cifras de `clips_analisis/` publicadas hasta septiembre de 2026 (SVC, VLM) incluían esos 13 partidos
   contaminados (13 de 70). Para el SVC son optimistas; para los VLM (sin entrenar) no afecta.
-- **T-DEED (`SoccerNetBall_test` y `challenge2`) preentrenó con SoccerNet-v2** (ver `estudio_deteccion_tiros.md`
-  §6): ningún partido de v2 sirve para evaluar T-DEED ni sus ajustes finos. Esta partición solo vale para
-  modelos entrenados por nosotros desde los clips (SVC, futuros).
+- **T-DEED (`SoccerNetBall_test` y `challenge2`) preentrenó con SoccerNet-v2**, pero solo con los splits
+  oficiales `train` (300 partidos) y `val` (100) del repo (`models/tdeed/T-DEED/data/soccernet/{train,val}.json`;
+  `train_tdeed.py` → `dataset/datasets.py:79-90`; comprobado el 2026-11-08). El **split `test` oficial (100 partidos)
+  no lo vio ningún checkpoint de T-DEED ni el baseline de sn-teamspotting** (mismos ficheros de split): es la única
+  evaluación limpia posible de la cabeza SoccerNet-v2 (17 eventos) de esos modelos, y la que hace comparables sus cifras
+  con las publicadas. Los 100 partidos están en `/mnt/datasets/SoccerNet/` (solo host; lista en
+  `output/benchmark/sn_v2_test_games.txt`). De nuestra lista de evaluación (63), 20 caen en ese `test` (entre ellos los 6 del benchmark de tiros)
+  (`output/benchmark/sn_v2_eval_clean_for_tdeed.txt`), 27 en `train` y 16 en `val`; los 100 del SVC y los 10 de
+  `sn_tuning_videos` están todos en `train`. Corrige la afirmación anterior de que "ningún partido de v2 sirve para
+  evaluar T-DEED". Para modelos entrenados por nosotros desde los clips (SVC) sigue valiendo esta partición.
 
 ## 2. SoccerNet Ball Action Spotting 2024 (7 partidos EFL: pases, conducciones, cabezazos, saques, tiros, goles…)
 

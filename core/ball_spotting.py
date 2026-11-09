@@ -69,6 +69,9 @@ _CONFIG_OF: dict[str, str] = {
     "SoccerNetBall_test": "SoccerNetBall_challenge1",
     "SoccerNetBall_challenge1": "SoccerNetBall_challenge1",
     "SoccerNetBall_challenge2": "SoccerNetBall_challenge2",
+    # Afinado en la cámara virtual de SoccerTrack v2 a partir de challenge2 (misma arquitectura). Solo para
+    # benchmarks (scripts/benchmark/); no es el modelo de producción.
+    "SNB_pano1": "SoccerNetBall_challenge2",
 }
 
 # Geometría con la que se entrenó T-DEED en SoccerNet Ball: frames a 796x448,

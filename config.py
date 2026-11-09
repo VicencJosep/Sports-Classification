@@ -38,7 +38,7 @@ OUTPUTS_DIR: Path = PROJECT_ROOT / "output"
 
 @dataclass(frozen=True)
 class TrackingConfig:
-    """Hiperparámetros de core/tracking.py (detector + ByteTrack)."""
+    """Hiperparámetros de core/tracking.py (detector + tracker BoT-SORT/ByteTrack)."""
 
     detector: str = "hybrid"                # "hybrid" | "soccermaster" | "yolo"
     yolo_model_path: str = "yolo11x.pt"
@@ -52,10 +52,29 @@ class TrackingConfig:
     confidence: float = 0.3                 # umbral personas
     ball_confidence: float = 0.15           # umbral (laxo) para el balón
     min_box_area: float = 300.0             # descarta cajas diminutas (gradas)
-    track_activation_threshold: float = 0.25
-    lost_track_buffer: int = 30
+    track_activation_threshold: float = 0.25  # BoT-SORT: track_high_thresh y new_track_thresh; ByteTrack: activación
+    lost_track_buffer: int = 72              # frames a 30 fps (se escala con el fps real): 60 frames a 25 fps. ByteTrack
+                                             # usaba 30; con BoT-SORT + ReID el buffer largo no cuesta IDSW (train, §7.10)
     minimum_matching_threshold: float = 0.8
     frame_rate: int | None = None            # None -> auto-detectar del vídeo real (ver process_video)
+    tracker: str = "botsort"                 # "botsort" (ultralytics: Kalman + GMC + ReID, desde el 6-nov-2026) |
+                                             # "bytetrack" (supervision, el anterior: sin GMC ni ReID). Medido con las
+                                             # mismas detecciones en el test de SoccerNet-Tracking:
+                                             # docs/comparativa_benchmark.md §7.10
+    track_low_threshold: float = 0.1         # BoT-SORT: confianza mínima para la segunda pasada de asociación
+    gmc_method: str = "sparseOptFlow"        # BoT-SORT: compensación del paneo de cámara ("none" la apaga)
+    reid: str = "osnet"                      # BoT-SORT: "osnet" | "prtreid" | "none" (ver core/osnet.py). Si faltan
+                                             # los pesos de OSNet, el tracker avisa y sigue sin ReID
+    reid_osnet_weights_path: Path = PROJECT_ROOT / "models" / "reid" / "osnet_x1_0_sports.pth.tar-60"
+    proximity_thresh: float = 0.5            # BoT-SORT: IoU mínima para que el ReID decida un emparejamiento
+    appearance_thresh: float = 0.95          # BoT-SORT: similitud de apariencia mínima (semántica de ultralytics). 0,8 es el
+                                             # valor de ultralytics; con reid_lost_without_gate hace falta 0,95 para que no
+                                             # mezcle compañeros (train: 0,8 → IDSW x4; 0,95 → mejor HOTA, sin mezclas)
+    nms_iou: float | None = 0.7              # BoT-SORT: NMS previo de personas; el detector a conf 0,1 duplica el 12 % de
+                                             # cajas y el ReID las resucitaba (−16 k FP en test con el NMS, mismo HOTA)
+    reid_lost_without_gate: bool = True      # BoT-SORT: un track perdido puede recuperarse solo por apariencia (bajo
+                                             # appearance_thresh). Test: HOTA 59,1 → 59,4, IDF1 69,8 → 70,5, reentradas
+                                             # recuperadas 1,2 → 4,2 %. Valor por defecto medido en §7.10 (2026-11-06)
     static_ball_window_frames: int = 750     # core.tracking.StaticBallFilter: un "balón" clavado en el mismo píxel
     static_ball_min_history_frames: int = 150  # frames de historial antes de empezar a filtrar (~6 s a 25 fps)
     static_ball_min_presence: float = 0.7    # en >= 70% de los últimos 750 frames es un escudo/logo del marcador,
@@ -426,6 +445,19 @@ class HighlightsConfig:
     w_vj_kickoff: float = 0.5
     goal_fusion_min: float = 1.4            # vjepa.goal_fusion >= esto (y celebración vista) -> "gol probable"
     goal_audio_min_db: float = 6.0          # griterío sostenido que, con celebración vista, hace "gol probable" (cámara única)
+
+    # SoccerHigh (analytics/highlights/soccerhigh.py): VideoMAEv2-Giant + transformer entrenado con los resúmenes
+    # oficiales de 237 partidos de SoccerNet. Da tramos "que entrarían en el resumen" con confianza; aquí son anclas
+    # (un tramo bueno sin tiro de T-DEED también es jugada), rasgo de reglas y red de seguridad para que el VLM los vea.
+    # Los rasgos se cachean junto al vídeo (<vídeo>.soccerhigh.VideoMAEv2_Giant_K710.npy; ~8 min por partido en GPU).
+    soccerhigh_enabled: bool = True
+    soccerhigh_backbone_path: str = "models/soccerhigh/vit_g_hybrid_pt_1200e_k710_ft.pth"
+    soccerhigh_checkpoint_path: str = "models/soccerhigh/soccerhigh_baseline_giant.pt"
+    soccerhigh_threshold: float = 0.5           # confianza por fotograma que propone tramo (0,5 en el paper)
+    soccerhigh_batch_size: int = 8              # clips de 16 fotogramas por lote en la GPU (2,3 GB con 4)
+    soccerhigh_anchor_min_score: float = 0.5    # un tramo con esta confianza es ancla por sí mismo
+    soccerhigh_vlm_min_score: float = 0.75      # ...y con esta lo juzga el VLM aunque no entre por reglas
+    w_soccerhigh: float = 2.5                   # reglas: por confianza máxima de SoccerHigh en la jugada
 
     # Selección final: entre min y max clips, por encima de select_min_score
     min_clips: int = 3

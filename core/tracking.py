@@ -3,7 +3,19 @@ core/tracking.py
 ================
 Detección y tracking multi-objeto para vídeo de fútbol.
 
-Pipeline: frames (BGR) -> Detector (inyectable) -> sv.Detections -> ByteTrack.
+Pipeline: frames (BGR) -> Detector (inyectable) -> sv.Detections -> tracker
+(BoT-SORT con GMC y ReID por defecto; ByteTrack como alternativa).
+
+Trackers (``PlayerTracker(tracker=...)``):
+
+* ``"botsort"`` (por defecto desde el 6-nov-2026): BoT-SORT de ultralytics con
+  compensación global de movimiento (GMC, flujo óptico disperso) y ReID
+  opcional (``reid="osnet"`` | ``"prtreid"`` | ``"none"``). La GMC corrige el
+  paneo de la cámara antes de asociar y el ReID recupera la identidad de un
+  jugador que sale del plano y vuelve. Medido en el test de SoccerNet-Tracking
+  con las mismas detecciones (docs/comparativa_benchmark.md §7.10).
+* ``"bytetrack"``: ``supervision.ByteTrack`` sin ReID ni GMC (el tracker
+  anterior; se conserva para comparar).
 
 Hay tres detectores intercambiables (misma interfaz `Detector`):
 
@@ -29,7 +41,7 @@ Ambos emiten `sv.Detections` en coordenadas de píxel del frame ORIGINAL, con
 `class_id` según la taxonomía de Soccer_Master (`ROLE_TO_CLASS_ID`) y los campos
 extra ``role`` / ``jersey`` en ``Detections.data``.
 
-El balón NO se pasa por ByteTrack: es un objeto pequeño y rápido que el tracker
+El balón NO se pasa por el tracker: es un objeto pequeño y rápido que este
 pierde constantemente, así que se resuelve por frame con la detección de mayor
 confianza. El resto de personas sí se trackean con IDs persistentes.
 
@@ -50,13 +62,17 @@ import logging
 import os
 import sys
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Generator, Iterator, Optional, Protocol, Sequence
+from typing import TYPE_CHECKING, Generator, Iterator, Optional, Protocol, Sequence
 
 import cv2
 import numpy as np
 import supervision as sv
+
+if TYPE_CHECKING:  # solo anotaciones: config.py vive en la raíz del proyecto y classification carga torch
+    from config import TrackingConfig
+    from core.classification import Embedder
 
 logger = logging.getLogger(__name__)
 
@@ -587,24 +603,221 @@ class StaticBallFilter:
         return self._counts.get(self._cell(x, y), 0) / n >= self.min_presence
 
 
+class _UlBoxes:
+    """Lo mínimo de ``ultralytics.engine.results.Boxes`` que piden sus trackers:
+    ``xyxy``/``xywh``/``conf``/``cls``, ``len`` e indexado por máscara."""
+
+    def __init__(self, xyxy: np.ndarray, conf: np.ndarray, cls: np.ndarray) -> None:
+        self.xyxy = np.asarray(xyxy, dtype=np.float32).reshape(-1, 4)
+        self.conf = np.asarray(conf, dtype=np.float32).reshape(-1)
+        self.cls = np.asarray(cls, dtype=np.float32).reshape(-1)
+
+    @property
+    def xywh(self) -> np.ndarray:
+        b = self.xyxy
+        return np.column_stack([(b[:, 0] + b[:, 2]) / 2, (b[:, 1] + b[:, 3]) / 2, b[:, 2] - b[:, 0], b[:, 3] - b[:, 1]])
+
+    def __len__(self) -> int:
+        return len(self.conf)
+
+    def __getitem__(self, mask) -> "_UlBoxes":
+        return _UlBoxes(self.xyxy[mask], self.conf[mask], self.cls[mask])
+
+
+class _EmbedderEncoder:
+    """Adapta un ``core.classification.Embedder`` (crops BGR de tamaño variable) a la
+    firma ``encoder(img, dets_xywh) -> list[feat | None]`` que BoT-SORT de ultralytics
+    espera de un modelo ReID externo."""
+
+    def __init__(self, embedder: "Embedder") -> None:
+        self.embedder = embedder
+
+    def __call__(self, img: np.ndarray, dets: np.ndarray) -> list[Optional[np.ndarray]]:
+        h, w = img.shape[:2]
+        crops: list[np.ndarray] = []
+        valid: list[bool] = []
+        for cx, cy, bw, bh in np.asarray(dets, dtype=float)[:, :4]:
+            x1, y1 = max(0, int(cx - bw / 2)), max(0, int(cy - bh / 2))
+            x2, y2 = min(w, int(round(cx + bw / 2))), min(h, int(round(cy + bh / 2)))
+            ok = x2 > x1 and y2 > y1
+            valid.append(ok)
+            if ok:
+                crops.append(img[y1:y2, x1:x2])
+        if not crops:
+            return [None] * len(valid)
+        # (N, D) float32; PRTReId devuelve (N, 1, D) y BoT-SORT quiere vectores planos.
+        feats = iter(np.asarray(self.embedder.embed_batch(crops), dtype=np.float32).reshape(len(crops), -1))
+        return [next(feats) if ok else None for ok in valid]
+
+
+def _make_botsort_lost_by_appearance():
+    """Subclase de BOTSORT cuyo ``get_dists`` no aplica la puerta de IoU a los tracks perdidos."""
+    from ultralytics.trackers.basetrack import TrackState
+    from ultralytics.trackers.bot_sort import BOTSORT
+    from ultralytics.trackers.utils import matching
+
+    class BotSortLostByAppearance(BOTSORT):
+        def get_dists(self, tracks, detections):
+            dists = matching.iou_distance(tracks, detections)
+            dists_mask = dists > (1 - self.proximity_thresh)
+            if self.args.fuse_score:
+                dists = matching.fuse_score(dists, detections)
+            if self.args.with_reid and self.encoder is not None:
+                emb_dists = matching.embedding_distance(tracks, detections) / 2.0
+                emb_dists[emb_dists > (1 - self.appearance_thresh)] = 1.0
+                lost = np.array([t.state == TrackState.Lost for t in tracks], dtype=bool)
+                dists_mask[lost] = False  # perdido: la apariencia decide sola (bajo appearance_thresh)
+                emb_dists[dists_mask] = 1.0
+                dists = np.minimum(dists, emb_dists)
+            return dists
+
+    return BotSortLostByAppearance
+
+
+class _LazyBotSortLost:
+    """``_BotSortLostByAppearance(args)`` sin importar ultralytics al cargar el módulo."""
+
+    _cls = None
+
+    def __call__(self, args):
+        if _LazyBotSortLost._cls is None:
+            _LazyBotSortLost._cls = _make_botsort_lost_by_appearance()
+        return _LazyBotSortLost._cls(args)
+
+
+_BotSortLostByAppearance = _LazyBotSortLost()
+
+
+class BotSortTracker:
+    """BoT-SORT de ultralytics (Kalman XYWH + GMC + ReID opcional) con la interfaz de este módulo.
+
+    ``update(persons, frame)`` recibe las personas ya filtradas (sin balón) y el frame BGR
+    y devuelve las que el tracker confirma en ese frame, con ``tracker_id``. Las cajas de
+    salida son las DETECTADAS (``persons[idx]``), no la predicción suavizada del Kalman,
+    igual que hace ``supervision.ByteTrack``: con el oráculo del benchmark las cajas del
+    Kalman perdían 9 puntos de LocA, y así role/jersey/confidence siguen siendo los de la
+    detección de origen.
+
+    Args:
+        frame_rate: fps del vídeo; ``track_buffer`` se expresa en frames a 30 fps y se
+            escala (como ``supervision.ByteTrack``).
+        track_high_thresh / track_low_thresh: confianza de la primera y la segunda pasada
+            de asociación (ByteTrack).
+        new_track_thresh: confianza mínima para abrir un track nuevo.
+        track_buffer: frames (a 30 fps) que un track perdido sigue vivo.
+        match_thresh: coste máximo (1 - IoU fusionado con la confianza) para asociar.
+        gmc_method: "sparseOptFlow" | "orb" | "sift" | "ecc" | "none".
+        embedder: extractor de apariencia (``core.classification.Embedder``) o None.
+        proximity_thresh: IoU mínima para que el ReID pueda decidir un emparejamiento.
+        appearance_thresh: similitud de apariencia mínima (semántica de ultralytics: se
+            descarta si la distancia coseno/2 supera ``1 - appearance_thresh``).
+        nms_iou: NMS (sin clases) sobre las personas antes de asociar (None lo apaga): el
+            detector a conf >= 0,1 emite un 12 % de cajas duplicadas (IoU > 0,7) y el ReID
+            las resucitaba como un segundo track del mismo jugador (+16 k FP en el test).
+        reid_lost_without_gate: para los tracks PERDIDOS no se exige la IoU de
+            ``proximity_thresh``: un jugador que vuelve al plano lejos de donde salió
+            puede recuperar su id solo por apariencia (siempre bajo ``appearance_thresh``).
+    """
+
+    def __init__(
+        self,
+        frame_rate: int = 30,
+        track_high_thresh: float = 0.25,
+        track_low_thresh: float = 0.1,
+        new_track_thresh: float = 0.25,
+        track_buffer: int = 30,
+        match_thresh: float = 0.8,
+        fuse_score: bool = True,
+        gmc_method: str = "sparseOptFlow",
+        embedder: Optional["Embedder"] = None,
+        proximity_thresh: float = 0.5,
+        appearance_thresh: float = 0.8,
+        nms_iou: Optional[float] = None,
+        reid_lost_without_gate: bool = False,
+    ) -> None:
+        from ultralytics.trackers.bot_sort import BOTSORT  # import perezoso: ultralytics tarda en cargar
+        from ultralytics.utils import IterableSimpleNamespace
+
+        args = IterableSimpleNamespace(
+            tracker_type="botsort", track_high_thresh=track_high_thresh, track_low_thresh=track_low_thresh,
+            new_track_thresh=new_track_thresh, track_buffer=track_buffer, match_thresh=match_thresh,
+            fuse_score=fuse_score, gmc_method=gmc_method, proximity_thresh=proximity_thresh,
+            appearance_thresh=appearance_thresh, with_reid=False, model="auto",
+        )
+        self._impl = (_BotSortLostByAppearance if reid_lost_without_gate else BOTSORT)(args)
+        self.nms_iou = nms_iou
+        if embedder is not None:
+            # Codificador externo: ``with_reid`` activa el término de apariencia en ``get_dists`` y
+            # ``model != "auto"`` hace que ``_input_for`` entregue el frame a ``init_track`` (con
+            # "auto" ultralytics espera los rasgos internos de su propio YOLO y no codifica nada).
+            self._impl.args.with_reid = True
+            self._impl.args.model = "external"
+            self._impl.encoder = _EmbedderEncoder(embedder)
+        self.with_reid = embedder is not None
+        self.gmc_method = gmc_method
+        self.frame_rate = frame_rate
+        self._track_buffer = track_buffer
+        self._apply_frame_rate()
+
+    def _apply_frame_rate(self) -> None:
+        self._impl.max_frames_lost = max(1, int(round(self.frame_rate / 30.0 * self._track_buffer)))
+
+    def reset(self) -> None:
+        self._impl.reset()
+        self._apply_frame_rate()
+
+    def update(self, persons: sv.Detections, frame: np.ndarray) -> sv.Detections:
+        if self.nms_iou is not None and len(persons) > 1:
+            persons = persons.with_nms(threshold=self.nms_iou, class_agnostic=True)
+        if len(persons):
+            boxes = _UlBoxes(persons.xyxy, persons.confidence, persons.class_id)
+        else:
+            boxes = _UlBoxes(np.zeros((0, 4)), np.zeros(0), np.zeros(0))
+        out = self._impl.update(boxes, frame)  # (N, 8): x1, y1, x2, y2, id, score, cls, idx
+        if out is None or len(out) == 0:
+            empty = persons[np.zeros(0, dtype=int)] if len(persons) else persons
+            empty.tracker_id = np.zeros(0, dtype=int)
+            return empty
+        out = np.asarray(out).reshape(-1, 8)
+        tracked = persons[out[:, 7].astype(int)]
+        tracked.tracker_id = out[:, 4].astype(int)
+        return tracked
+
+
 class PlayerTracker:
-    """Orquesta Detector (inyectado) + ByteTrack.
+    """Orquesta Detector (inyectado) + tracker (BoT-SORT por defecto, ByteTrack opcional).
 
     El detector se pasa ya construido (inyección de dependencias), lo que
     permite testear con un stub y alternar YOLO/SoccerMaster sin tocar esta
     clase. El tracker acumula frames hasta ``detector.chunk_size`` y procesa
-    el lote, manteniendo el orden temporal que ByteTrack necesita.
+    el lote, manteniendo el orden temporal que el tracker necesita.
 
     Args:
         detector: implementación de `Detector` (SoccerMasterDetector, YoloDetector...).
-        confidence: umbral de confianza para personas.
+        confidence: umbral de confianza para personas (entrada del tracker en modo
+            ByteTrack; en BoT-SORT la entrada baja a ``track_low_threshold``, porque su
+            segunda pasada de asociación vive de las detecciones flojas).
         ball_confidence: umbral (más laxo) para el balón, que se detecta débil.
         min_box_area: descarta cajas diminutas (público en gradas, falsos positivos).
         track_activation_threshold / lost_track_buffer / minimum_matching_threshold:
-            hiperparámetros de ByteTrack (ver docs de supervision).
+            hiperparámetros comunes a los dos trackers (en BoT-SORT: track_high_thresh y
+            new_track_thresh, track_buffer, match_thresh). Los valores por defecto son los
+            medidos en docs/comparativa_benchmark.md §7.10 (ajustados en train, una pasada en
+            test): BoT-SORT + GMC + NMS 0,7 + OSNet, buffer 72 (= 60 frames a 25 fps),
+            perdidos recuperables por apariencia a 0,95. El ByteTrack anterior usaba buffer 30.
         frame_rate: fps nominal del vídeo (para el buffer de tracks perdidos).
         static_ball_window_frames / static_ball_min_presence: ver ``StaticBallFilter``
             (descarta "balones" clavados en el mismo píxel: escudos, logos).
+        tracker: "botsort" | "bytetrack".
+        track_low_threshold: (BoT-SORT) confianza mínima para entrar en la segunda pasada.
+        gmc_method: (BoT-SORT) compensación de movimiento de cámara; "none" la apaga.
+        reid: (BoT-SORT) "osnet" | "prtreid" | "none". Se ignora si se pasa ``embedder``.
+            Si faltan los pesos de OSNet se avisa y se sigue sin ReID.
+        reid_weights_path: pesos del OSNet (solo ``reid="osnet"``; None = ``core.osnet.DEFAULT_OSNET_WEIGHTS_PATH``).
+        proximity_thresh / appearance_thresh: (BoT-SORT) ver ``BotSortTracker``.
+        nms_iou / reid_lost_without_gate: (BoT-SORT) ver ``BotSortTracker``.
+        embedder: extractor de apariencia ya construido (inyección; p. ej. un stub en tests).
+        device: dispositivo del ReID (None = cuda si hay).
     """
 
     def __init__(
@@ -614,23 +827,46 @@ class PlayerTracker:
         ball_confidence: float = 0.15,
         min_box_area: float = 300.0,
         track_activation_threshold: float = 0.25,
-        lost_track_buffer: int = 30,
+        lost_track_buffer: int = 72,
         minimum_matching_threshold: float = 0.8,
         frame_rate: Optional[int] = None,
         static_ball_window_frames: int = 750,
         static_ball_min_presence: float = 0.7,
         static_ball_min_history_frames: int = 150,
+        tracker: str = "botsort",
+        track_low_threshold: float = 0.1,
+        gmc_method: str = "sparseOptFlow",
+        reid: str = "osnet",
+        reid_weights_path: Path | str | None = None,
+        proximity_thresh: float = 0.5,
+        appearance_thresh: float = 0.95,
+        nms_iou: Optional[float] = 0.7,
+        reid_lost_without_gate: bool = True,
+        embedder: Optional["Embedder"] = None,
+        device: Optional[str] = None,
     ) -> None:
+        if tracker not in ("botsort", "bytetrack"):
+            raise ValueError(f"Tracker desconocido: {tracker!r} (usa 'botsort' o 'bytetrack')")
         self.detector = detector
         self.confidence = confidence
         self.ball_confidence = ball_confidence
         self.min_box_area = min_box_area
+        self.tracker_kind = tracker
+        self.track_low_threshold = track_low_threshold
         self._static_ball = StaticBallFilter(
             static_ball_window_frames, static_ball_min_presence, min_history_frames=static_ball_min_history_frames
         )
         self._track_activation_threshold = track_activation_threshold
         self._lost_track_buffer = lost_track_buffer
         self._minimum_matching_threshold = minimum_matching_threshold
+        self._gmc_method = gmc_method
+        self._proximity_thresh = proximity_thresh
+        self._appearance_thresh = appearance_thresh
+        self._nms_iou = nms_iou
+        self._reid_lost_without_gate = reid_lost_without_gate
+        self._embedder = embedder
+        if tracker == "botsort" and embedder is None:
+            self._embedder = self._build_embedder(reid, reid_weights_path, device)
         # frame_rate=None -> auto-detectar del vídeo real en process_video() (evita
         # el desfase silencioso de usar un frame_rate nominal distinto al real del
         # vídeo al dimensionar lost_track_buffer). Si se pasa explícito, se respeta
@@ -638,12 +874,79 @@ class PlayerTracker:
         self._frame_rate = frame_rate
         self.tracker = self._build_tracker(frame_rate or 30)
 
-    def _build_tracker(self, frame_rate: int) -> sv.ByteTrack:
-        return sv.ByteTrack(
-            track_activation_threshold=self._track_activation_threshold,
-            lost_track_buffer=self._lost_track_buffer,
-            minimum_matching_threshold=self._minimum_matching_threshold,
+    @classmethod
+    def from_config(cls, detector: Detector, cfg: "TrackingConfig", device: Optional[str] = None) -> "PlayerTracker":
+        """Construye el tracker con los hiperparámetros de ``config.TrackingConfig``."""
+        return cls(
+            detector,
+            confidence=cfg.confidence,
+            ball_confidence=cfg.ball_confidence,
+            min_box_area=cfg.min_box_area,
+            track_activation_threshold=cfg.track_activation_threshold,
+            lost_track_buffer=cfg.lost_track_buffer,
+            minimum_matching_threshold=cfg.minimum_matching_threshold,
+            frame_rate=cfg.frame_rate,
+            static_ball_window_frames=cfg.static_ball_window_frames,
+            static_ball_min_presence=cfg.static_ball_min_presence,
+            static_ball_min_history_frames=cfg.static_ball_min_history_frames,
+            tracker=cfg.tracker,
+            track_low_threshold=cfg.track_low_threshold,
+            gmc_method=cfg.gmc_method,
+            reid=cfg.reid,
+            reid_weights_path=cfg.reid_osnet_weights_path,
+            proximity_thresh=cfg.proximity_thresh,
+            appearance_thresh=cfg.appearance_thresh,
+            nms_iou=cfg.nms_iou,
+            reid_lost_without_gate=cfg.reid_lost_without_gate,
+            device=device or cfg.device,
+        )
+
+    @property
+    def needs_frames(self) -> bool:
+        """True si el tracker mira los píxeles (GMC y ReID de BoT-SORT), no solo las cajas."""
+        return self.tracker_kind == "botsort"
+
+    @staticmethod
+    def _build_embedder(reid: str, weights_path: Path | str | None, device: Optional[str]) -> Optional["Embedder"]:
+        if reid in (None, "none", ""):
+            return None
+        if reid == "osnet":
+            from core.osnet import DEFAULT_OSNET_WEIGHTS_PATH, OSNetEmbedder
+
+            path = Path(weights_path or DEFAULT_OSNET_WEIGHTS_PATH)
+            if not path.exists():
+                logger.warning("ReID desactivado: no hay pesos de OSNet en %s", path)
+                return None
+            logger.info("ReID del tracker: OSNet x1.0 (%s)", path.name)
+            return OSNetEmbedder(path, device=device)
+        if reid == "prtreid":
+            from core.classification import PRTReIdEmbedder
+
+            logger.info("ReID del tracker: PRTReId (el mismo embedder que la asignación de equipos)")
+            return PRTReIdEmbedder(device=device)
+        raise ValueError(f"ReID desconocido: {reid!r} (usa 'osnet', 'prtreid' o 'none')")
+
+    def _build_tracker(self, frame_rate: int):
+        if self.tracker_kind == "bytetrack":
+            return sv.ByteTrack(
+                track_activation_threshold=self._track_activation_threshold,
+                lost_track_buffer=self._lost_track_buffer,
+                minimum_matching_threshold=self._minimum_matching_threshold,
+                frame_rate=frame_rate,
+            )
+        return BotSortTracker(
             frame_rate=frame_rate,
+            track_high_thresh=self._track_activation_threshold,
+            track_low_thresh=self.track_low_threshold,
+            new_track_thresh=self._track_activation_threshold,
+            track_buffer=self._lost_track_buffer,
+            match_thresh=self._minimum_matching_threshold,
+            gmc_method=self._gmc_method,
+            embedder=self._embedder,
+            proximity_thresh=self._proximity_thresh,
+            appearance_thresh=self._appearance_thresh,
+            nms_iou=self._nms_iou,
+            reid_lost_without_gate=self._reid_lost_without_gate,
         )
 
     # ------------------------------------------------------------------ #
@@ -658,7 +961,7 @@ class PlayerTracker:
     ) -> list[FrameTrackingResult]:
         """Detección + tracking sobre un lote de frames BGR consecutivos.
 
-        El lote debe respetar el orden temporal; ByteTrack se actualiza frame
+        El lote debe respetar el orden temporal; el tracker se actualiza frame
         a frame internamente para mantener IDs coherentes.
         """
         detections_per_frame = self.detector.detect(frames)
@@ -676,8 +979,12 @@ class PlayerTracker:
         frame_idx: int,
         timestamp_s: float,
     ) -> FrameTrackingResult:
-        persons = self._filter_persons(detections)
-        persons = self.tracker.update_with_detections(persons)
+        if self.tracker_kind == "botsort":
+            persons = self._filter_persons(detections, self.track_low_threshold)
+            persons = self.tracker.update(persons, frame)
+        else:
+            persons = self._filter_persons(detections, self.confidence)
+            persons = self.tracker.update_with_detections(persons)
         ball_dets, ball_record = self._resolve_ball(detections)
 
         roles = persons.data.get("role", np.asarray(["player"] * len(persons)))
@@ -784,13 +1091,13 @@ class PlayerTracker:
     #  Helpers internos
     # ------------------------------------------------------------------ #
 
-    def _filter_persons(self, detections: sv.Detections) -> sv.Detections:
+    def _filter_persons(self, detections: sv.Detections, min_confidence: float) -> sv.Detections:
         """No-balón con confianza suficiente y área mínima (fuera público lejano)."""
         if len(detections) == 0:
             return detections
         mask = (
             (detections.class_id != BALL_CLASS_ID)
-            & (detections.confidence >= self.confidence)
+            & (detections.confidence >= min_confidence)
             & (detections.box_area >= self.min_box_area)
         )
         return detections[mask]
@@ -876,8 +1183,18 @@ def build_detector(
     )
 
 
-def ensure_tracking(video_path: Path, detector_name: str = "hybrid", device: Optional[str] = None) -> Path:
+def ensure_tracking(
+    video_path: Path,
+    detector_name: str = "hybrid",
+    device: Optional[str] = None,
+    tracking: Optional["TrackingConfig"] = None,
+) -> Path:
     """Corre PlayerTracker sobre video_path si tracks.jsonl no existe ya (caché).
+
+    El tracker se construye con ``tracking`` (``config.TrackingConfig``; por defecto
+    el de ``config.py``: BoT-SORT con GMC y ReID). Ojo con la caché: un
+    ``tracks.jsonl`` ya existente se reutiliza aunque se haya hecho con otro
+    tracker; para rehacerlo hay que borrarlo.
 
     Escribe primero a un ``.tmp`` y solo renombra al fichero final si termina
     sin errores — si un intento previo se cortó a mitad (crash/OOM/Ctrl-C), el
@@ -896,9 +1213,13 @@ def ensure_tracking(video_path: Path, detector_name: str = "hybrid", device: Opt
         logger.info("tracks.jsonl ya existe, reutilizando: %s", tracks_path)
         return tracks_path
 
-    logger.info("Corriendo core.tracking (%s) sobre %s ...", detector_name, video_path)
+    from config import TrackingConfig  # import perezoso: config.py vive en la raíz del proyecto
+
+    cfg = tracking or TrackingConfig()
+    logger.info("Corriendo core.tracking (%s, tracker %s, reid %s) sobre %s ...",
+                detector_name, cfg.tracker, cfg.reid if cfg.tracker == "botsort" else "-", video_path)
     detector = build_detector(detector_name, device=device)
-    tracker = PlayerTracker(detector=detector)
+    tracker = PlayerTracker.from_config(detector, cfg, device=device)
     tmp_path = tracks_path.with_suffix(tracks_path.suffix + ".tmp")
     with open(tmp_path, "w") as f:
         for result in tracker.process_video(video_path):
@@ -911,7 +1232,7 @@ def main() -> None:
     import argparse
     from contextlib import ExitStack
 
-    parser = argparse.ArgumentParser(description="Tracking fútbol: detector + ByteTrack")
+    parser = argparse.ArgumentParser(description="Tracking fútbol: detector + BoT-SORT (o ByteTrack)")
     parser.add_argument("--source", required=True, help="Ruta al vídeo .mp4")
     parser.add_argument("--output", default="tracks.jsonl", help="Salida JSONL")
     parser.add_argument(
@@ -935,9 +1256,15 @@ def main() -> None:
     parser.add_argument("--max-frames", type=int, default=None)
     parser.add_argument(
         "--frame-rate", type=int, default=None,
-        help="fps nominal para ByteTrack (lost_track_buffer). Por defecto (sin "
+        help="fps nominal para el buffer de tracks perdidos. Por defecto (sin "
              "indicar), se auto-detecta del vídeo real en process_video().",
     )
+    parser.add_argument("--tracker", choices=["botsort", "bytetrack"], default="botsort",
+                        help="botsort = ultralytics con GMC y ReID (por defecto); bytetrack = supervision, el anterior")
+    parser.add_argument("--reid", choices=["osnet", "prtreid", "none"], default="osnet",
+                        help="extractor de apariencia de BoT-SORT (ignorado con --tracker bytetrack)")
+    parser.add_argument("--gmc", default="sparseOptFlow",
+                        help="compensación de movimiento de cámara de BoT-SORT: sparseOptFlow | orb | sift | ecc | none")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
@@ -950,7 +1277,8 @@ def main() -> None:
         ball_imgsz=args.ball_imgsz,
         ball_model_path=args.ball_model or None,
     )
-    tracker = PlayerTracker(detector=detector, frame_rate=args.frame_rate)
+    tracker = PlayerTracker(detector=detector, frame_rate=args.frame_rate, tracker=args.tracker,
+                            reid=args.reid, gmc_method=args.gmc, device=args.device)
 
     with ExitStack() as stack:
         f = stack.enter_context(open(args.output, "w"))

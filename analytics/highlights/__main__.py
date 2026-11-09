@@ -6,7 +6,8 @@
     # Rutas explícitas (lo que deja `python -m main --mode full-match`):
     python -m analytics.highlights --video partido.mp4 --pipeline-output output/mipartido --out output/mipartido/highlights
 
-    --no-vlm: solo reglas (sin modelo).  --no-vjepa: sin V-JEPA2.  --no-cut: no escribir clips.  --force: rehacer señales y cachés.
+    --no-vlm: solo reglas (sin modelo).  --no-vjepa: sin V-JEPA2.  --no-soccerhigh: sin los tramos de SoccerHigh.
+    --no-cut: no escribir clips.  --force: rehacer señales y cachés.
 """
 
 from __future__ import annotations
@@ -46,6 +47,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--no-vlm", action="store_true")
     parser.add_argument("--no-vjepa", action="store_true", help="sin el voto de V-JEPA2 para gol")
+    parser.add_argument("--no-soccerhigh", action="store_true", help="sin los tramos de SoccerHigh (VideoMAEv2-Giant)")
     parser.add_argument("--no-cut", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--vlm-url", default=None)
@@ -72,7 +74,7 @@ def main() -> None:
     cfg = replace(cfg, **overrides)
 
     report = generate_highlights(inputs, args.out, cfg, use_vlm=not args.no_vlm, use_vjepa=not args.no_vjepa,
-                                 cut=not args.no_cut, force=args.force)
+                                 cut=not args.no_cut, force=args.force, use_soccerhigh=not args.no_soccerhigh)
     print(f"\n{len(report['highlights'])} highlights (de {report['n_candidates']} candidatos; VLM: {report['vlm']['used']})")
     for h in report["highlights"]:
         print(f"  {h['rank']:2d}. {hms(h['start_s'])} - {hms(h['end_s'])} ({h['duration_s']:.0f} s) "

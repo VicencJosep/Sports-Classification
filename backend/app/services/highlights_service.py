@@ -133,6 +133,9 @@ class HighlightsService:
         resp.vlm_used = bool(vlm.get("used", False))
         resp.vlm_degraded = bool(vlm.get("degraded", False))
         resp.vjepa_used = bool((report.get("vjepa") or {}).get("used", False))
+        soccerhigh = report.get("soccerhigh") or {}
+        resp.soccerhigh_used = bool(soccerhigh.get("used", False))
+        resp.n_soccerhigh_segments = int(soccerhigh.get("n_segments", 0))
         scoreboard = report.get("scoreboard")
         if scoreboard is not None:
             resp.scoreboard_available = bool(scoreboard.get("available", False))
@@ -146,6 +149,7 @@ class HighlightsService:
                 duration_s=h["duration_s"], anchor_s=h["anchor_s"],
                 team_cluster=h.get("team") if h.get("team", -1) >= 0 else None,
                 final_score=h.get("final_score", 0.0), vlm_rank=h.get("vlm_rank"), goal_source=h.get("goal_source"),
+                soccerhigh_score=h.get("soccerhigh_score"),
                 content_url=f"{base}/{h['id']}/content" if h.get("clip") else None,
             ))
         return resp

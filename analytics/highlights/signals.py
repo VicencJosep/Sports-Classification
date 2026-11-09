@@ -73,6 +73,7 @@ class MatchSignals:
     n_players_xy: np.ndarray           # jugadores con field_xy en el bin (media)
     actions: list[dict] = field(default_factory=list)   # telemetry.ball_actions + t_s + team
     events: list[dict] = field(default_factory=list)    # telemetry.events -> {label, t_s, score}
+    soccerhigh_segments: list[dict] = field(default_factory=list)   # tramos de SoccerHigh {start_s, end_s, score} (curva 'soccerhigh')
 
     @property
     def n_bins(self) -> int:
@@ -99,7 +100,8 @@ class MatchSignals:
             audio_rel=self.audio_rel, audio_sustained=self.audio_sustained, possessor=self.possessor,
             team=self.team, ball_xy=self.ball_xy, possessor_xy=self.possessor_xy,
             players_left_frac=self.players_left_frac, n_players_xy=self.n_players_xy,
-            actions=json.dumps(self.actions), events=json.dumps(self.events), **arrays,
+            actions=json.dumps(self.actions), events=json.dumps(self.events),
+            soccerhigh_segments=json.dumps(self.soccerhigh_segments), **arrays,
         )
 
     @classmethod
@@ -112,6 +114,7 @@ class MatchSignals:
                 possessor=z["possessor"], team=z["team"], ball_xy=z["ball_xy"], possessor_xy=z["possessor_xy"],
                 players_left_frac=z["players_left_frac"], n_players_xy=z["n_players_xy"],
                 actions=json.loads(str(z["actions"])), events=json.loads(str(z["events"])),
+                soccerhigh_segments=json.loads(str(z["soccerhigh_segments"])) if "soccerhigh_segments" in z.files else [],
             )
 
 
@@ -368,6 +371,20 @@ def build_signals(
         events=events_from_telemetry(telemetry),
         **field_data,
     )
+
+
+# --------------------------------------------------------------------------- #
+#  SoccerHigh
+# --------------------------------------------------------------------------- #
+
+def attach_soccerhigh(sig: MatchSignals, frame_scores: np.ndarray, segments: list[dict], fps: int = 2) -> None:
+    """Curva ``soccerhigh`` (confianza por fotograma a 2 fps = la rejilla de 0,5 s) y tramos en las señales."""
+    curve = np.zeros(sig.n_bins, np.float32)
+    idx = np.minimum(((np.arange(len(frame_scores)) / fps) // GRID_S).astype(int), sig.n_bins - 1)
+    np.maximum.at(curve, idx, np.asarray(frame_scores, np.float32))
+    sig.curves["soccerhigh"] = curve
+    sig.soccerhigh_segments = [{"start_s": float(s["start_s"]), "end_s": float(s["end_s"]), "score": float(s["score"])}
+                               for s in segments]
 
 
 # --------------------------------------------------------------------------- #
