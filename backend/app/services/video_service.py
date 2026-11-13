@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import threading
+import uuid
 from pathlib import Path
 from typing import BinaryIO
 
@@ -11,6 +14,7 @@ from app.schemas import Video, VideoRecord
 from app.schemas.common import new_id, utcnow_iso
 
 from .ffprobe import probe_video
+from .thumbnails import grab_frame
 
 _MEDIA_TYPES = {
     "mp4": "video/mp4", "webm": "video/webm", "mkv": "video/x-matroska",
@@ -23,6 +27,7 @@ class VideoService:
         self.settings = settings
         self.storage = storage
         self.repo = repo
+        self._thumbnail_slots = threading.BoundedSemaphore(max(1, settings.thumbnail_workers))
 
     def upload(self, original_filename: str, stream: BinaryIO) -> VideoRecord:
         name = Path(original_filename or "").name or "video"
@@ -76,6 +81,27 @@ class VideoService:
             raise NotFoundError(f"video file for {video_id} is missing")
         return path, _MEDIA_TYPES.get(record.container, "application/octet-stream")
 
+    def thumbnail(self, video_id: str, time_s: float, height: int) -> bytes:
+        """JPEG del fotograma en ``time_s``. Los instantes se redondean a décimas de segundo, así que la misma
+        miniatura se pide siempre igual y sale de ``<video_dir>/thumbs/`` a partir de la segunda vez."""
+        record = self.get(video_id)
+        path = self.path(record)
+        if not path.exists():
+            raise NotFoundError(f"video file for {video_id} is missing")
+        last_frame_s = max(0.0, record.duration_s - 1.0 / max(record.fps, 1.0))
+        tenths = min(int(round(max(0.0, time_s) * 10)), int(last_frame_s * 10))     # nunca más allá del último fotograma
+        cached = self.storage.video_dir(record.id) / "thumbs" / f"h{height}" / f"{tenths:07d}.jpg"
+        if cached.exists():
+            return cached.read_bytes()
+        with self._thumbnail_slots:
+            data = grab_frame(path, tenths / 10, height, self.settings.ffmpeg_bin)
+        cached.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cached.with_name(f"{cached.name}.{uuid.uuid4().hex}.tmp")
+        tmp.write_bytes(data)
+        os.replace(tmp, cached)
+        return data
+
     def to_public(self, record: VideoRecord) -> Video:
-        data = record.model_dump(exclude={"stored_filename", "content_url"})
-        return Video(**data, content_url=f"{self.settings.public_base_url}/api/videos/{record.id}/content")
+        data = record.model_dump(exclude={"stored_filename", "content_url", "thumbnail_url"})
+        base = f"{self.settings.public_base_url}/api/videos/{record.id}"
+        return Video(**data, content_url=f"{base}/content", thumbnail_url=f"{base}/thumbnail")

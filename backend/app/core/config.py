@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 8 * 1024 ** 3
     allowed_extensions: str = ".mp4,.mkv,.mov,.webm,.avi"
     ffprobe_bin: str = "ffprobe"
+    # Tamaño máximo de una respuesta a una petición Range del vídeo (0 = sin tope). El navegador pide "desde aquí
+    # hasta el final" y deja la conexión abierta mientras su búfer está lleno; por un túnel SSH esas conexiones se
+    # quedan colgadas con MB en cola y no dejan pasar el resto. Con tope, cada petición termina y pide la siguiente.
+    video_range_chunk_bytes: int = 2 * 1024 * 1024
+    ffmpeg_bin: str = "ffmpeg"        # miniaturas de la tira del editor de clips
+    thumbnail_workers: int = 4        # ffmpeg a la vez como mucho (la máquina es compartida)
 
     # Pipeline: se ejecuta como subproceso con el intérprete de ML, desde la raíz del repo.
     project_root: Path = PROJECT_ROOT

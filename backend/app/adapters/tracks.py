@@ -15,10 +15,21 @@ from app.schemas import BallDetection, PersonDetection, TrackingFrame
 _ROLES = frozenset({"player", "goalkeeper", "referee", "other"})
 
 
-def _xy(value) -> tuple[float, float] | None:
+# Decimales que salen por la API. El pipeline escribe float32 con 6-15 cifras (``389.52386474609375``); para
+# dibujar sobre el vídeo basta la décima de píxel y para el campo el centímetro. Una ventana baja un 25 % comprimida.
+_PX_DECIMALS = 1
+_FIELD_DECIMALS = 2
+_CONFIDENCE_DECIMALS = 3
+
+
+def _xy(value, decimals: int = _PX_DECIMALS) -> tuple[float, float] | None:
     if value is None:
         return None
-    return (float(value[0]), float(value[1]))
+    return (round(float(value[0]), decimals), round(float(value[1]), decimals))
+
+
+def _box(value) -> tuple[float, ...]:
+    return tuple(round(float(v), _PX_DECIMALS) for v in value)
 
 
 def to_tracking_frame(record: dict, possessor_tracker_id: int | None = None) -> TrackingFrame:
@@ -26,22 +37,22 @@ def to_tracking_frame(record: dict, possessor_tracker_id: int | None = None) -> 
         persons = [
             PersonDetection(
                 tracker_id=int(t["tracker_id"]),
-                box=tuple(float(v) for v in t["xyxy"]),
+                box=_box(t["xyxy"]),
                 anchor=_xy(t["anchor_xy"]),
-                confidence=float(t["confidence"]),
+                confidence=round(float(t["confidence"]), _CONFIDENCE_DECIMALS),
                 role=t["role"] if t.get("role") in _ROLES else "other",
                 jersey=int(t["jersey"]) if isinstance(t.get("jersey"), int) else None,
-                field_xy=_xy(t.get("field_xy")),
+                field_xy=_xy(t.get("field_xy"), _FIELD_DECIMALS),
             )
             for t in record.get("tracks", [])
         ]
         ball_raw = record.get("ball")
         ball = (
             BallDetection(
-                box=tuple(float(v) for v in ball_raw["xyxy"]),
+                box=_box(ball_raw["xyxy"]),
                 center=_xy(ball_raw["center_xy"]),
-                confidence=float(ball_raw["confidence"]),
-                field_xy=_xy(ball_raw.get("field_xy")),
+                confidence=round(float(ball_raw["confidence"]), _CONFIDENCE_DECIMALS),
+                field_xy=_xy(ball_raw.get("field_xy"), _FIELD_DECIMALS),
             )
             if ball_raw
             else None

@@ -4,7 +4,8 @@ from fastapi.responses import FileResponse
 from app.api.deps import Services, get_services
 from app.schemas import (
     AnalysisStartRequest, AnalysisStatusResponse, HighlightsResponse, HighlightsStartRequest, Match, MatchCreate,
-    PartAnalysis, Tracklet, TrackingWindow,
+    PartAnalysis, ReviewExport, ReviewExportRequest, ReviewItemCreate, ReviewItemPatch, ReviewItemResult,
+    ReviewedAnalysis, Tracklet, TrackingWindow,
 )
 from app.schemas.common import ID_PATTERN
 
@@ -13,6 +14,8 @@ router = APIRouter(prefix="/matches", tags=["matches"])
 MatchId = Path(pattern=ID_PATTERN)
 PartId = Path(pattern=r"^(full|first-half|second-half)$")
 ClipId = Path(pattern=r"^hl-\d{2}$")
+# Ids de la copia revisada: los del análisis (``act-<frame>``, ``evt-<n>``) y los añadidos a mano (``act-new-<hex>``).
+ItemId = Path(pattern=r"^(act|evt)-[A-Za-z0-9-]{1,40}$")
 
 
 @router.get("", response_model=list[Match])
@@ -76,6 +79,65 @@ def part_tracklets(
 ) -> list[Tracklet]:
     services.matches.get_record(match_id)
     return services.memory.get_tracklets(match_id, part_id)
+
+
+# --- copia revisada (verdad anotada desde el visor) ---------------------------- #
+
+@router.get("/{match_id}/parts/{part_id}/review", response_model=ReviewedAnalysis)
+def part_review(
+    match_id: str = MatchId, part_id: str = PartId, services: Services = Depends(get_services)
+) -> ReviewedAnalysis:
+    """El análisis tal como hay que enseñarlo: la copia revisada si existe; si no, la salida del pipeline."""
+    services.matches.get_record(match_id)
+    return services.review.get(match_id, part_id)
+
+
+@router.post("/{match_id}/parts/{part_id}/review/items", response_model=ReviewItemResult, status_code=201)
+def review_add_item(
+    data: ReviewItemCreate, match_id: str = MatchId, part_id: str = PartId, services: Services = Depends(get_services)
+) -> ReviewItemResult:
+    """Añade una acción de balón o un evento que el pipeline no detectó."""
+    services.matches.get_record(match_id)
+    return services.review.add(match_id, part_id, data)
+
+
+@router.patch("/{match_id}/parts/{part_id}/review/items/{item_id}", response_model=ReviewItemResult)
+def review_update_item(
+    data: ReviewItemPatch, match_id: str = MatchId, part_id: str = PartId, item_id: str = ItemId,
+    services: Services = Depends(get_services),
+) -> ReviewItemResult:
+    """Corrige etiqueta, instante, ejecutor o lado. La primera corrección crea la copia revisada."""
+    services.matches.get_record(match_id)
+    return services.review.update(match_id, part_id, item_id, data)
+
+
+@router.delete("/{match_id}/parts/{part_id}/review/items/{item_id}", response_model=ReviewItemResult)
+def review_delete_item(
+    match_id: str = MatchId, part_id: str = PartId, item_id: str = ItemId, services: Services = Depends(get_services)
+) -> ReviewItemResult:
+    """Borra de la copia revisada algo que el pipeline detectó de más (se puede deshacer con ``restore``)."""
+    services.matches.get_record(match_id)
+    return services.review.delete(match_id, part_id, item_id)
+
+
+@router.post("/{match_id}/parts/{part_id}/review/items/{item_id}/restore", response_model=ReviewItemResult)
+def review_restore_item(
+    match_id: str = MatchId, part_id: str = PartId, item_id: str = ItemId, services: Services = Depends(get_services)
+) -> ReviewItemResult:
+    services.matches.get_record(match_id)
+    return services.review.restore(match_id, part_id, item_id)
+
+
+@router.post("/{match_id}/parts/{part_id}/review/export", response_model=ReviewExport)
+def review_export(
+    data: ReviewExportRequest | None = None,
+    match_id: str = MatchId, part_id: str = PartId, services: Services = Depends(get_services),
+) -> ReviewExport:
+    """Hoja de verdad ``tiempo,etiqueta,dorsal,equipo`` de un tramo de la copia revisada; también queda guardada
+    en ``review/`` para ``scripts/evaluate_match.py --csv``."""
+    services.matches.get_record(match_id)
+    data = data or ReviewExportRequest()
+    return services.review.export(match_id, part_id, data.from_s, data.to_s)
 
 
 # --- mejores jugadas ---------------------------------------------------------- #

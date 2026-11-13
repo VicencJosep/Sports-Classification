@@ -16,6 +16,10 @@ throw-in=THROW IN, tackle=PLAYER SUCCESSFUL TACKLE, block=BALL PLAYER BLOCK.
 Uso (contenedor):
     python -m scripts.benchmark.eval_f1_pcbas --model AdaSpot_big --split test
     python -m scripts.benchmark.eval_f1_pcbas --model SNB_pano1 --dataset st2
+    python -m scripts.benchmark.eval_f1_pcbas --model AdaSpot_big --dataset pcbas --tag val_merged
+
+Con ``--dataset pcbas`` se evalúa el propio split de validación de FOOTPASS (predicciones de
+``eval_bas.py --dataset pcbas``); ``val_merged`` es la variante correcta, porque FOOTPASS no separa el pase alto.
 """
 
 from __future__ import annotations
@@ -26,7 +30,7 @@ from pathlib import Path
 
 import numpy as np
 
-from scripts.benchmark.eval_bas import LABELS_ROOT, OUT_ROOT, OUT_ROOT_ST2, TDEED_DIR
+from scripts.benchmark.eval_bas import LABELS_ROOT, OUT_ROOT, OUT_ROOT_PCBAS, OUT_ROOT_ST2, TDEED_DIR
 
 CLASS_MAP = {"drive": "DRIVE", "pass": "PASS", "cross": "CROSS", "shot": "SHOT", "header": "HEADER",
              "throw-in": "THROW IN", "tackle": "PLAYER SUCCESSFUL TACKLE", "block": "BALL PLAYER BLOCK"}
@@ -54,14 +58,18 @@ def match(gt_ms: list[float], pred: list[tuple[float, float]]) -> tuple[int, int
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--model", required=True)
-    ap.add_argument("--dataset", default="efl", choices=["efl", "st2"])
+    ap.add_argument("--dataset", default="efl", choices=["efl", "st2", "pcbas"])
     ap.add_argument("--split", default="test")
     ap.add_argument("--view", default="vcam796vl1")
+    ap.add_argument("--tag", default="val_merged", help="pcbas: val | val_merged")
     args = ap.parse_args()
 
     if args.dataset == "efl":
         games = [g["video"] for g in json.loads((TDEED_DIR / "data" / "soccernetball" / f"{args.split}.json").read_text())]
         label_root, out_root = LABELS_ROOT, OUT_ROOT / args.model / args.split
+    elif args.dataset == "pcbas":
+        out_root, label_root = OUT_ROOT_PCBAS / args.model / args.tag, OUT_ROOT_PCBAS / "labels"
+        games = json.loads((out_root / "summary.json").read_text())["games"]
     else:
         summary = json.loads((OUT_ROOT_ST2 / args.model / args.view / "summary.json").read_text())
         games, label_root, out_root = summary["games"], OUT_ROOT_ST2 / "labels", OUT_ROOT_ST2 / args.model / args.view
@@ -84,7 +92,7 @@ def main() -> None:
         per_class[name] = {"P": round(100 * prec, 1), "R": round(100 * rec, 1),
                            "F1": round(100 * (2 * prec * rec / (prec + rec) if prec + rec else 0.0), 1), "n_gt": tp + fn}
     macro = float(np.mean([v["F1"] for v in per_class.values()]))
-    tag = args.split if args.dataset == "efl" else args.view
+    tag = {"efl": args.split, "st2": args.view, "pcbas": args.tag}[args.dataset]
     print(f"{args.model} [{tag}] Macro-F1@0.15 ±12f (solo clase, 8 clases FOOTPASS): {macro:.2f}  "
           + "  ".join(f"{c} {v['F1']:.1f}" for c, v in per_class.items()))
     (out_root / "f1_pcbas.json").write_text(json.dumps({"model": args.model, "games": games, "macro_f1": round(macro, 2),

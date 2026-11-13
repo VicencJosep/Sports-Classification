@@ -121,3 +121,125 @@
   images) y se borraron `infer_mp4.py`, `eval_captions.py`, `eval_classification_head.py` y las constantes
   `SOCCER_MASTER_*` de `config.py`. Criterio: traza en ejecución del detector (abre `backbone.pt`, las 5 cabezas y
   `google/siglip2-large-patch16-512`; nada más). Quedan 5 GB en `Soccer_Master/`.
+- **2026-11-09** (RoI anotada frente a saliencia en AdaSpot, `docs/comparativa_benchmark.md` §7.14; rama
+  `exp/adaspot-new-roi`). Encargo del usuario («Fase 1»): medir la «ceguera espacial» del selector de RoI no supervisado
+  de AdaSpot y el techo con RoI perfecta, con los pesos congelados, en SN-BAS test, FOOTPASS val y SoccerTrack v2 eval.
+  Tres premisas del encargo no se cumplen en los datos [M]: **SN-BAS no trae coordenadas de nada** (solo instante, clase
+  y equipo; el artículo de AdaSpot lo reconoce en su §G.2), **FOOTPASS trae jugadores pero no balón**, y **la pista de
+  balón de SoccerTrack v2 no sirve para centrar un recorte de 112 px** (reconstruida entre eventos y anclada en la
+  posición de evento del proveedor: a 32 px de mediana de los pies del ejecutor y a más de 56 px en el 31 % de los
+  eventos). La RoI GT se define igual en FOOTPASS y SoccerTrack v2: caja del jugador que ejecuta cada evento, interpolada
+  entre ejecutores consecutivos (83 % y 92-99 % de los eventos cubiertos); en SN-BAS solo caben un control (recorte
+  central) y un pseudo-GT con el balón de nuestro detector (41-71 % de los eventos). Código, sin tocar el repo de
+  AdaSpot: `scripts/benchmark/adaspot_gt_roi.py` (pistas, `RoIOverride` en el sitio de `roi_selector`, `with_rois` sobre
+  el dataset de inferencia), `adaspot_scores.py --use_gt_roi / --roi saliency gt center det` (varias variantes por
+  lectura de vídeo y centros de RoI guardados en la caché), `eval_f1_pcbas.py --dataset pcbas`, `adaspot_roi_report.py`
+  y `run_adaspot_gt_roi.sh`. Comprobaciones: el modo saliencia reproduce las cachés bit a bit; devolverle al modelo sus
+  propios centros da diferencia 0; la ventana de la cámara virtual se reconstruye a ±1 px. De paso, `adaspot_scores.py`
+  usaba 2 workers sobre un dataset iterable y puntuaba cada clip dos veces (mismo resultado, 25 % más de tiempo): ahora 1.
+  La cola se lanzó a las 11:27 dentro del contenedor (`docker exec -d`) y una segunda tanda de sensibilidad (RoI en los
+  pies del ejecutor; saliencia desplazada lo mínimo para contenerlo) queda en cola detrás. Primer resultado [M],
+  FOOTPASS con AdaSpot-b: saliencia 41,2 mAP@1 / 44,5 Macro-F1@0,15, RoI GT 39,8 / 42,7, recorte central 36,2 / 39,9. El
+  selector deja fuera al ejecutor en el 23 % de los eventos (la mitad de los tiros) y esos se detectan 22 puntos peor,
+  pero apuntarle el recorte no los recupera (recall 57,1 → 56,3): con pesos congelados el selector no es el cuello de
+  botella. Mismo patrón con AdaSpot-b en SoccerTrack v2 (selector ciego en el 62-66 % de los eventos, pero 5,3 → 5,1 de
+  mAP con RoI GT: su apagón en panorámica no es del selector) y en SN-BAS (recorte central 50,4 frente a 54,9; pseudo-GT
+  54,5). A las 12:12 la cola se quedó esperando GPU (otros procesos ocupaban 16 GB): se relanzó con lotes de 2 clips
+  (4 GB en vez de 7,4), que mueven el mAP ±0,1 (medido re-puntuando la saliencia en SN-BAS: 54,92 → 55,03). AdaSpot-s y
+  la segunda tanda quedan en cola; la tabla (`output/benchmark/adaspot_gt_roi/tabla.md`) está pendiente de volcar entera.
+- **2026-11-11** (cierre de §7.14 y §7.15: qué frena a los spotters y fusión; rama `exp/adaspot-new-roi`, todo sin GPU).
+  Las dos colas de la RoI de AdaSpot acabaron el 2026-11-09 a las 14:30 y se volcaron al documento 7.14 (§5.4 y §6):
+  AdaSpot-s repite el patrón de AdaSpot-b (RoI GT 1-2 pt de mAP por debajo de la saliencia en TV, 2-2,4 en panorámica), la
+  RoI en los pies no cambia nada y la saliencia corregida empata; la Fase 2 (reentrenar con RoI supervisada) queda
+  descartada. El usuario pidió entonces por dónde mejorar T-DEED o AdaSpot en todas las clases y en cualquier metraje, sin
+  panorámica. Dos scripts nuevos: `scripts/benchmark/spotter_errors.py` (clasifica cada fallo y cada predicción sobrante
+  al umbral de trabajo; `--versus` cruza dos modelos) y `scripts/benchmark/fuse_scores.py` (media ponderada de las cachés
+  de probabilidad de varios modelos, escrita como una caché más; `--tune` barre pesos en Middlesbrough). En `eval_bas.py`
+  el post-proceso y el evaluador pasan a `evaluate_candidates()` (mismas cifras, comprobado). Hallazgos [M]: (1) no hay
+  ceguera: T-DEED deja sin respuesta el 1-2 % de los eventos; pierde por confianza baja (13 % en SN-BAS test, 17 % en
+  FOOTPASS), etiqueta equivocada (5-7 %) e instante (3-6 %), y en FOOTPASS el 21 % de sus predicciones no tiene ningún
+  evento a ±0,5 s; (2) las clases que hunden la media casi no tienen ejemplos de entrenamiento (34 entradas, 100 tiros,
+  128 bloqueos en 4 partidos); (3) T-DEED y AdaSpot-b se complementan (en FOOTPASS cada uno acierta un 14 % de eventos
+  que el otro falla); (4) la fusión 0,5 / 0,5, que es también el óptimo del barrido en validación, da en SN-BAS test
+  62,5 → 64,0 de mAP y F1 80,5 → 82,0, y en FOOTPASS val 50,1 → 54,3 de mAP, F1 64,6 → 75,4 y 2.659 → 1.377 falsos
+  positivos; con el modelo de producción en FOOTPASS, 53,2 → 56,1, F1 65,9 → 77,2 y 2.170 → 1.072; (5) pesos por clase
+  y AdaSpot-s como tercer modelo no aportan; (6) la fusión no sube tiro, saque de banda, bloqueo ni entrada. Quedan
+  propuestas en §2.1, sin lanzar: integrar la fusión en el pipeline y afinar con el train de FOOTPASS (48 partidos).
+  Cachés fusionadas: `<vídeo>.tdeed.Fusion_{T200_AdaB,T200_AdaB_pc,T200_AdaBS,C2_AdaB}.npz`; resultados en
+  `output/benchmark/{bas,bas_pcbas}/Fusion_*` y `output/benchmark/errors/`.
+  Segunda pasada el mismo día, a petición del usuario («seguro que hay algún ajuste de arquitectura o de combinación»),
+  también sin GPU. (7) Separando detección de etiqueta en las cachés por frame: la AP de «hay una acción» sin clase es
+  92,0 con la fusión en SN-BAS test y 86,2 en FOOTPASS, y si cada detección llevase la etiqueta correcta el mAP por clase
+  pasaría de 66,5 a 87,0 y de 56,3 a 78,5; tiros, centros y bloqueos se detectan en el 93-100 % de los casos y se
+  etiquetan bien en el 61 %, 77 % y 15 %. (8) Combinaciones descartadas: T-DEED + sn-teamspotting 62,5 (no suma nada
+  frente a 62,5 de T-DEED solo), tres modelos 63,7, media geométrica 61,8; en FOOTPASS dos T-DEED suben los falsos
+  positivos (2.541). (9) `scripts/benchmark/stack_scores.py`, segunda etapa aprendida (TCN de 75.000 parámetros sobre las
+  curvas de los spotters congelados, CPU): en FOOTPASS dejando un partido fuera, T-DEED solo 50,1 → 53,3 de mAP y F1
+  64,6 → 71,9; sobre la fusión, mAP igual (54,3), F1 75,4 → 77,7 y 1.377 → 1.026 falsos positivos; con la cabeza de SN-v2
+  como entrada 55,1 / 78,1; con producción + AdaSpot-b, F1 79,4 y 969 falsos positivos. Mejora las clases con más de
+  ~100 ejemplos (cabezazo +5) y empeora las que tienen menos (entrada, tiro); en SN-BAS test, entrenada con un solo
+  partido, no gana a la media (62,5; 64,1 añadiendo FOOTPASS en las clases comunes). Propuestas en §2.1, sin lanzar.
+
+- **2026-11-11 (anotación desde el visor)**: el usuario quiere seguir la verdad de un juvenil (min 10-60) corrigiendo
+  en el visor lo que detecta el pipeline en vez de teclear la hoja CSV. Hecho, sin GPU, en `backend/` (rama
+  `exp/adaspot-new-roi`, sin commit) y en el frontend (rama `feat/clip-editor`, sin commit):
+  (1) **copia revisada**: `backend/app/services/review_service.py` + rutas `…/parts/{part}/review[/items|/export]`. La
+  primera corrección copia `memory/analysis.json` a `review/analysis.json` y todo se guarda ahí (más `edits.jsonl`); el
+  análisis del pipeline no se toca. Corregir = etiqueta (vocabulario de `annotation_csv.py`), instante, `tracker_id`
+  del ejecutor y lado local/visitante (una vez por tracklet); borrar con deshacer; añadir lo no detectado.
+  (2) **Editor de clips** del frontend: abierto sobre una acción o un evento (tarjeta del vídeo, lápiz de la lista o
+  tecla `E`; `N` añade en el instante actual) tiene, además de «Save clip», «Apply correction» y «Delete». Teclas 1-0
+  para el tipo, `T` instante, `H`/`A` equipo, Enter guarda y el vídeo sigue; el jugador se elige con un clic sobre él en
+  el vídeo. Una barra bajo el reproductor cuenta lo corregido/añadido/borrado y exporta el tramo.
+  (3) **Hoja exportada** = formato de `scripts/annotation_csv.py` (`review/ground_truth_<desde>-<hasta>.csv`); lo no
+  tocado en el tramo cuenta como correcto; acción + evento de la misma jugada a < 1,5 s = una fila. Comprobado de
+  punta a punta en Middlesbrough con una instancia aislada: el lector la lee sin avisos y `evaluate_match --csv` da
+  las diferencias esperadas [M: una acción reetiquetada, otra añadida y un evento pasado a córner → drive 24/25, high_pass 3/4].
+  Verificación: 30 tests del backend, 83 del frontend, recorrido real en Chromium (32 comprobaciones). Avisos de
+  método: la verdad así obtenida hereda los candidatos y los instantes del pipeline del que parte (favorece a
+  producción frente a otras variantes; sembrar con umbral bajo vía `respot_telemetry.py` lo reduce) y el equipo solo
+  queda en las filas cuyo tracklet se ha marcado. Las 126 filas ya anotadas del Espanyol 25-30 no hace falta
+  importarlas: `evaluate_match --csv` acepta varias hojas.
+
+- **2026-11-12 (el editor atascaba el túnel)**: anotando el Mallorca (`433f62c92b727870`) por el reenvío de puertos de
+  VS Code, «Apply correction» tardaba y al rato la web dejó de cargar. Medido: guardar son 37-85 ms en el backend y
+  1 KB en el cable [M]; lo que atascaba era la tira de miniaturas del editor de clips, que sacaba los fotogramas con un
+  `<video preload="auto">` aparte saltando por el fichero: **38 MB por apertura** [M] y peticiones de rango que el
+  túnel no cerraba; en el servidor había 15 descargas de vídeo abiertas con 50 MB en cola de envío (`ss`, Send-Q) y
+  detrás de ellas esperaban el PATCH y la propia página. Arreglo: `GET /api/videos/{id}/thumbnail?t=&h=` (ffmpeg,
+  3-4 KB, 100-160 ms la primera vez y 2 ms desde `videos/<id>/thumbs/`; `backend/app/services/thumbnails.py`) y
+  `Filmstrip` con `<img>` e instantes en rejilla (mismas URL al reabrir); abrir el editor baja ahora 40 KB de
+  miniaturas (más 580 KB de tracking la primera vez en cada zona) [M]. Segundo coste, de CPU: cada cambio de estado
+  del visor repintaba las ~1.500 filas de «Ball actions» (350-415 ms de Enter a editor cerrado en el servidor, con el
+  modo desarrollo de React); con la lista y sus filas memorizadas (`BallActionList`, `useStableCallback`) son
+  123-142 ms [M]. Tests: 31 del backend, 85 del frontend, recorrido en Chromium 32/32. Al reiniciar el backend con
+  descargas de vídeo abiertas, uvicorn se queda esperando a que acaben: hay que matarlo con `-9`. Pendiente si el
+  túnel se vuelve a atascar con el reproductor: acotar las respuestas a rangos abiertos (`bytes=N-`) a unos pocos MB.
+  Segunda parte del mismo día: «Tracking unavailable» y recargas de la página mientras el usuario anotaba. El
+  backend respondía bien (ni un error desde el reinicio); lo provoqué yo: dos reinicios del backend con su página
+  abierta y ediciones del frontend en caliente (cada guardado se recarga en su navegador), más un cargador de tracking
+  que no reintentaba. Desde entonces el frontend se prueba en una copia aparte (otro Vite, otro backend) y se aplica de
+  una vez. Preparado y probado ahí: (a) respuestas `Range` del vídeo acotadas a 2 MB
+  (`BACKEND_VIDEO_RANGE_CHUNK_BYTES`): Chromium reproduce y salta igual, 12 MB en toda la prueba y como mucho una
+  conexión abierta de 2 MB, frente a 4 conexiones colgadas con 4 MB en cola cada una [M]; (b) tracking con coordenadas
+  redondeadas (−25 % comprimido) y ventanas de 10 s en vez de 30 s: abrir el editor en una zona nueva baja 171 KB en
+  total (eran 620 KB) [M]; (c) el cargador de tracking reintenta solo (1, 2, 4... 15 s) y solo dice «unavailable» tras
+  tres fallos seguidos, y se recupera sin recargar. Tests: 32 del backend, 88 del frontend, recorrido 32/32.
+- **2026-11-12 (valoración de PAVE, PCBAS 2026)**: el usuario pidió analizar el paper de resultados de SoccerNet 2026 y
+  valorar si replicar PAVE desde cero o aplicar partes a T-DEED/AdaSpot (sin GPU). Leídos: §3 y §8.2 del paper de
+  resultados, el informe técnico de PAVE (arXiv 2606.28389), el paper de FOOTPASS (arXiv 2511.16183) y el README de
+  `JeremieOchin/FOOTPASS`; listado del repo HF `SoccerNet/SN-PCBAS-2026` con nuestro token (train 352x640 22,8 GB +
+  tácticos 2,5 GB; Full HD 184 GB; sin posición del balón). Hallazgos: (1) PAVE es TAAD → DST del dataset con transformer
+  temporal por tracklet, atención entre los 26 jugadores y ensemble de 4 con filtro de acuerdo (descarta lo que apoya un
+  solo modelo, salvo tackle); su entrada es el tracking certificado de FOOTPASS, no vídeo ni tracking propio. (2) La
+  palanca es el estado del juego: baselines en test Macro-F1 TAAD 23,8 → +GNN 34,5 → +DST 46,4 (calculadas de sus F1 por
+  clase [P]); PAVE 58,9. (3) La validación de PAVE son nuestros 3 partidos de FOOTPASS val: en los mismos partidos PAVE
+  (con jugador) hace 60,9 frente a 47,6 de T-DEED y 43,0 de AdaSpot-b (solo clase, umbral óptimo) [M]; gana en banda,
+  centro, conducción y tiro, empata en cabezazo, bloqueo y entrada. (4) Replicar: código público sin pesos, pérdida y
+  muestreo sin publicar, 1-2 días de GPU por pasada [NV], y en inferencia pediría equipo/dorsal/rol de calidad EPTS que
+  no tenemos (equipo 62-68 % en juveniles): descartado. Escrito `docs/pave_valoracion.md` (§0 resumen, §2 tabla por
+  clase, §3 réplica, §4 qué trasladar, §5 tracking, §6 orden); dos filas nuevas en la hoja de ruta §2.1 a 0 GPU
+  (fusión por evento con filtro de acuerdo; estado del juego del h5 táctico de FOOTPASS val en `stack_scores.py`) y
+  un test de 20-30 min de GPU (352x640 frente a Full HD) antes de decidir la descarga del train. Del tracking: PAVE no
+  aporta nada; FOOTPASS val sirve como verdad plateada de equipo, dorsal y homografía en partidos enteros. Enlaces en
+  §7.7 y en la tabla de `CLAUDE.md`. Nada lanzado en GPU.

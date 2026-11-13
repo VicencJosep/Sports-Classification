@@ -18,6 +18,7 @@ from app.services.football_memory import FootballMemory
 from app.services.highlights_service import HighlightsService
 from app.services.match_service import MatchService
 from app.services.pipeline import PipelineLauncher
+from app.services.review_service import ReviewService
 from app.services.video_service import VideoService
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class Services:
     analysis: AnalysisService
     memory: FootballMemory
     highlights: HighlightsService
+    review: ReviewService
 
     def start_workers(self) -> None:
         self.analysis.start_worker()
@@ -51,6 +53,7 @@ def build_services(settings: Settings) -> Services:
     memory = FootballMemory(settings, runs, video_repo)
     analysis = AnalysisService(settings, match_repo, video_repo, runs, PipelineLauncher(settings), memory, gpu_lock)
     highlights = HighlightsService(settings, runs, gpu_lock)
+    review = ReviewService(settings, runs, video_repo, memory)
     matches = MatchService(match_repo, runs, videos, analysis, highlights)
 
     def chain_highlights(run: AnalysisRun) -> None:
@@ -62,6 +65,7 @@ def build_services(settings: Settings) -> Services:
     analysis.on_completed = chain_highlights
     return Services(
         settings=settings, videos=videos, matches=matches, analysis=analysis, memory=memory, highlights=highlights,
+        review=review,
     )
 
 

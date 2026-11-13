@@ -21,6 +21,7 @@ class Video(BaseModel):
     browser_playable: bool
     uploaded_at: str
     content_url: str = Field(description="URL del fichero (soporta Range)")
+    thumbnail_url: str = Field(default="", description="URL de las miniaturas: añade ?t=<segundos>&h=<alto en px>")
 
 
 class VideoRecord(Video):

@@ -7,6 +7,10 @@ from .highlights import (
     HighlightClip, HighlightsResponse, HighlightsRun, HighlightsStartRequest, HighlightsSummary,
 )
 from .match import Match, MatchCreate, MatchPart, MatchPartCreate, MatchPartRecord, MatchRecord
+from .review import (
+    ReviewExport, ReviewExportRequest, ReviewFile, ReviewInfo, ReviewItemCreate, ReviewItemPatch, ReviewItemResult,
+    ReviewedAnalysis, ReviewedBallAction, ReviewedEvent,
+)
 from .tracking import BallDetection, PersonDetection, TrackingFrame, TrackingWindow
 from .video import Video, VideoRecord
 
@@ -15,5 +19,7 @@ __all__ = [
     "BallAction", "BallDetection", "HighlightClip", "HighlightsResponse", "HighlightsRun",
     "HighlightsStartRequest", "HighlightsSummary", "Match", "MatchCreate", "MatchEvent", "MatchPart",
     "MatchPartCreate", "MatchPartRecord", "MatchRecord", "PartAnalysis", "PartAnalysisStatus", "PartKind",
-    "PersonDetection", "TeamAssignments", "Tracklet", "TrackingFrame", "TrackingWindow", "Video", "VideoRecord",
+    "PersonDetection", "ReviewExport", "ReviewExportRequest", "ReviewFile", "ReviewInfo", "ReviewItemCreate",
+    "ReviewItemPatch", "ReviewItemResult", "ReviewedAnalysis", "ReviewedBallAction", "ReviewedEvent",
+    "TeamAssignments", "Tracklet", "TrackingFrame", "TrackingWindow", "Video", "VideoRecord",
 ]

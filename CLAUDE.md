@@ -29,6 +29,7 @@ Análisis de partidos de fútbol a partir de vídeo. Resumen del pipeline y de l
 | Tracking | `docs/estado_arte_tracking.md` y la fila 7.10 de la comparativa |
 | Fallos de dependencias o del build | `docs/dependencias_y_problemas.md` |
 | Un artículo (T-DEED, AdaSpot, SoccerNet 2026) | `docs/papers/<nombre>.md` por secciones con `grep` (50-115 KB cada uno); no leas el PDF |
+| Qué trasladar de PAVE (ganador de PCBAS 2026) a nuestros spotters | `docs/pave_valoracion.md` §0 y §6 |
 | API | `backend/README.md` |
 
 ## Al documentar

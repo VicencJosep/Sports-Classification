@@ -42,6 +42,11 @@ sale de un dataset, split, detector o tolerancia distintos.
   Average-mAP tight y el 800MF de producción 25,3 (dedicados: 62-73). Córner (P 81 / R 74), banda, balón fuera y libre
   directo son utilizables; tarjeta, cambio, fuera de juego y saque inicial no (AP < 11). En PCBAS el modelo de producción
   da 53,1 de mAP@1 y F1 65,2 con 2.136 falsos positivos: mismo problema de calibración que el 200MF fuera de la EFL.
+- **Qué frena a los spotters y fusión (§7.14 y §7.15, 2026-11-11)**: a AdaSpot no lo frena dónde cae su recorte (la RoI
+  anotada no mejora a la saliencia). T-DEED y AdaSpot-b ven casi todos los eventos y fallan por confianza baja y, en las
+  clases raras, por falta de ejemplos (34 entradas y 100 tiros en el entrenamiento). Fusionarlos frame a frame con pesos
+  iguales da 64,0 de mAP en SN-BAS test (T-DEED solo 62,5) y, en FOOTPASS, 54,3 de mAP y F1 75,4 con la mitad de falsos
+  positivos (T-DEED solo 50,1 / 64,6); no mejora tiro, saque de banda, bloqueo ni entrada.
 - **No merece la pena**: CALF, NetVLAD++, FOOTPASS como modelo, el tracker MOTIP de SoccerMaster y el detector de
   GTATrack. Los tres últimos no publican pesos.
 
@@ -262,3 +267,5 @@ es un fichero `7.NN_*.md` nuevo más una fila aquí; las citas «§7.N» del có
 | 7.11 | 2026-11-08 | Tabla única de spotters con pesos públicos | TV: T-DEED 61,2 > sn-teamspotting 55,5 > AdaSpot-b 54,9 > OSL 34,5. Panorámica: la cámara ideal da lo mismo que la nuestra (±2 pt). Coste 12-14× tiempo real. | `docs/comparativa_benchmark/7.11_tabla_unica_spotters.md` |
 | 7.12 | 2026-11-09 | Punto de trabajo (P/R/FP) y metraje nuevo (SN-PCBAS-2026 val) | En PCBAS, T-DEED 200MF mAP 50,0 / F1 64,0 / 2.600 FP frente a AdaSpot-b 41,1 / 71,5 / 1.121; `challenge2` 53,1 / 65,2 / 2.136. | `docs/comparativa_benchmark/7.12_punto_de_trabajo_prf_pcbas.md` |
 | 7.13 | 2026-11-09 | Cabeza de 17 eventos de SoccerNet-v2 (20 partidos limpios) | Average-mAP tight: 200MF 21,4, producción 25,3 (dedicados 62-73). Córner utilizable (P 81 / R 74); tarjeta, cambio, fuera de juego y saque inicial no. | `docs/comparativa_benchmark/7.13_cabeza_17_eventos_snv2.md` |
+| 7.14 | 2026-11-09 | AdaSpot: RoI del selector de saliencia frente a RoI anotada (GT), pesos congelados | La RoI anotada no mejora a la saliencia en ningún dataset ni con AdaSpot-b ni con AdaSpot-s (FOOTPASS, AdaSpot-b: 41,2 de mAP frente a 39,8 con RoI GT y 36,2 con recorte central). El selector deja fuera al ejecutor en el 23-34 % de los eventos en TV, pero darle la RoI correcta no los recupera. Fase 2 (reentrenar) descartada. | `docs/comparativa_benchmark/7.14_adaspot_roi_gt.md` |
+| 7.15 | 2026-11-11 | Anatomía de errores de T-DEED y AdaSpot-b, y fusión de los dos (sin GPU) | Fallan por confianza baja (13-17 % de los eventos) y por falta de ejemplos en las clases raras, no por ceguera (1-2 % sin respuesta). Fusión 0,5 / 0,5: SN-BAS test 62,5 → 64,0 de mAP; FOOTPASS 50,1 → 54,3 y F1 64,6 → 75,4 con la mitad de falsos positivos (producción: 53,2 → 56,1, F1 65,9 → 77,2). No sube tiro, banda, bloqueo ni entrada. Detectar está casi resuelto (AP 92 sin clase); con la etiqueta perfecta el mAP sería 87 (SN-BAS) y 78,5 (FOOTPASS). Segunda etapa aprendida sobre las curvas: F1 79,4 y 969 FP en FOOTPASS con producción + AdaSpot-b; necesita ~100 ejemplos por clase. | `docs/comparativa_benchmark/7.15_errores_y_fusion_spotters.md` |

@@ -135,7 +135,6 @@ def main() -> None:
     ap.add_argument("--nms", action="store_true", help="Evalúa también NMS duro además del suave")
     args = ap.parse_args()
 
-    tdeed_eval = _tdeed_eval()
     if args.dataset == "efl":
         names = [g["video"] for g in json.loads((TDEED_DIR / "data" / "soccernetball" / f"{args.split}.json").read_text())]
         games = [(g, LABELS_ROOT / g / "720p") for g in names]
@@ -154,24 +153,36 @@ def main() -> None:
         probs = merge_high_pass(sc.probs, sc.classes) if args.merge_high_pass else sc.probs
         preds.append({"video": game, "events": candidates(probs, sc.classes), "fps": sc.fps / sc.stride})
 
+    counts, results = evaluate_candidates(preds, stride, [g for g, _ in games], label_root, out_root, args.metrics,
+                                          nms=args.nms, title=f"{args.model} [{tag}")
+    summary = {"model": args.model, "dataset": args.dataset, "games": [g for g, _ in games], "gt_counts": counts,
+               "results": results}
+    (out_root / "summary.json").write_text(json.dumps(summary, indent=1))
+
+
+def evaluate_candidates(preds: list[dict], stride: int, games: list[str], label_root: Path, out_root: Path,
+                        metrics=("at1",), nms: bool = False, title: str = "") -> tuple[dict, dict]:
+    """NMS suave (y duro con ``nms``) + evaluador oficial sobre los candidatos de ``candidates``. Escribe las
+    predicciones en ``<out_root>/<variante>/preds`` y devuelve (eventos GT por clase, resultados por variante/métrica).
+    Con ``title`` vacío no imprime (lo usa ``fuse_scores.py`` para barrer pesos)."""
+    tdeed_eval = _tdeed_eval()
     # Ventanas de T-DEED en filas a 12,5 fps (stride 2); se escalan al stride de la caché.
     w_nms, w_snms = (max(1, round(w * 2 / stride)) for w in tdeed_eval.WINDOWS_SNB)
     variants = {f"snms{w_snms}": tdeed_eval.soft_non_maximum_supression(preds, window=w_snms, threshold=0.01)}
-    if args.nms:
+    if nms:
         variants[f"nms{w_nms}"] = tdeed_eval.non_maximum_supression(preds, window=w_nms, threshold=0.01)
     counts = {c: 0 for c in tdeed_eval_classes()}
-    for game, _ in games:
+    for game in games:
         for a in json.loads((label_root / game / "Labels-ball.json").read_text())["annotations"]:
             counts[a["label"]] += 1
-    summary = {"model": args.model, "dataset": args.dataset, "games": [g for g, _ in games], "gt_counts": counts,
-               "results": {}}
+    results = {}
     for name, pred in variants.items():
         out = out_root / name
         # store_json_snb escribe en <dir(pred_path)>/preds/<game>/results_spotting.json
         tdeed_eval.store_json_snb(str(out / "pred"), pred, stride=stride)
-        for metric in args.metrics:
-            with contextlib.redirect_stderr(io.StringIO()):
-                res = tdeed_eval.aux_evaluate(str(label_root), str(out / "preds"), list_games=[g for g, _ in games],
+        for metric in metrics:
+            with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO() if not title else sys.stdout):
+                res = tdeed_eval.aux_evaluate(str(label_root), str(out / "preds"), list_games=games,
                                               prediction_file="results_spotting.json", version=2, metric=metric,
                                               num_classes=12, label_files="Labels-ball.json", dataset="Ball",
                                               framerate=25)
@@ -181,13 +192,14 @@ def main() -> None:
             map10 = float(np.mean([v for c, v in per_class.items() if c not in ("FREE KICK", "GOAL")]))
             map_n10 = float(np.mean([v for c, v in per_class.items() if counts[c] >= 10]))
             map_pcbas8 = float(np.mean([per_class[c] for c in PCBAS_CLASSES.values()]))
-            summary["results"][f"{name}/{metric}"] = {
+            results[f"{name}/{metric}"] = {
                 "mAP": round(100 * float(res["a_mAP"]), 2), "mAP_10cls": round(map10, 2),
                 "mAP_n10": round(map_n10, 2), "mAP_pcbas8": round(map_pcbas8, 2), "per_class": per_class}
-            print(f"{args.model} [{tag}, {name}, {metric}] mAP {100 * res['a_mAP']:.2f} (10 clases {map10:.2f}, "
-                  f"clases con >=10 GT {map_n10:.2f}, 8 FOOTPASS {map_pcbas8:.2f})  "
-                  + "  ".join(f"{c} {v:.1f}" for c, v in per_class.items()))
-    (out_root / "summary.json").write_text(json.dumps(summary, indent=1))
+            if title:
+                print(f"{title}, {name}, {metric}] mAP {100 * res['a_mAP']:.2f} (10 clases {map10:.2f}, "
+                      f"clases con >=10 GT {map_n10:.2f}, 8 FOOTPASS {map_pcbas8:.2f})  "
+                      + "  ".join(f"{c} {v:.1f}" for c, v in per_class.items()))
+    return counts, results
 
 
 def tdeed_eval_classes() -> list[str]:
