@@ -95,10 +95,10 @@ No se versionan: `datasets/`, `models/`, `output/`, `temp/`, `runs/`.
 | Saber qué toca ahora y qué está descartado | `docs/hoja_de_ruta.md` |
 | Datasets y particiones train/val/eval | `docs/datasets.md`, `docs/particion_datasets.md` |
 | Cifras frente al estado del arte | `docs/comparativa_benchmark.md` (un fichero por resultado en `docs/comparativa_benchmark/`) |
-| Estado del arte | `docs/estado_arte_tracking.md`, `docs/estado_arte_highlights.md` |
-| Mejores jugadas | `docs/highlights_evaluacion.md`, `docs/highlights_soccerhigh.md` |
+| Estado del arte y artículos | `docs/estado_del_arte/` (tracking, highlights, valoración de PAVE; artículos en Markdown en `papers/`) |
+| Mejores jugadas | `docs/highlights/evaluacion.md`, `docs/highlights/soccerhigh.md` |
 | Problemas de dependencias y parches a `Soccer_Master` | `docs/dependencias_y_problemas.md` |
-| Material cerrado | `docs/archivo/` (estudio de detección de tiros, bitácora completa) |
+| Material cerrado | `docs/archivo/` (estudio de detección de tiros, bitácora completa, valoración de ideas de octubre, catálogo de baloncesto) |
 
 ## Referencias
 

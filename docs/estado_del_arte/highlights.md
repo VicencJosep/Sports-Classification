@@ -2,7 +2,7 @@
 
 Resumen a 2026-11-01. Fuentes verificadas (paper, código y datos abiertos) en
 `output/research_notes/highlights_sota_verificacion_2026-11-01.md`; nuestro mecanismo actual en
-`docs/highlights_evaluacion.md`.
+`docs/highlights/evaluacion.md`.
 
 ## 1. Dónde está el campo
 
@@ -44,7 +44,7 @@ Resumen a 2026-11-01. Fuentes verificadas (paper, código y datos abiertos) en
 | 4 | Posiciones: PathCRF con sus pesos y la regla de saque de centro sobre Sportec Open (7 partidos, abierto) y SoccerTrack v2 (posiciones reales y nuestro tracking del mismo vídeo) | CPU | Saber si la posesión y el gol sin balón aguantan con nuestro tracking antes de entrenar nada |
 | 5 | Anotación de juveniles: un "resumen de referencia" por partido (jugadas con inicio, momento clave, fin, tipo, obligatoria, nota) en los 2 partidos de evaluación | Trabajo manual | Única forma de medir fuera de TV y de fijar la política de corte |
 
-Decisiones pendientes: reparto de GPU entre los pasos 2 y 3; orden de los pasos 2 y 4. El paso 1 está hecho el 2026-11-02 sin `video.ini` (desfase por alineación de rasgos) y, además, el modelo de SoccerHigh se ha portado y metido en el pipeline: ver `docs/highlights_soccerhigh.md`.
+Decisiones pendientes: reparto de GPU entre los pasos 2 y 3; orden de los pasos 2 y 4. El paso 1 está hecho el 2026-11-02 sin `video.ini` (desfase por alineación de rasgos) y, además, el modelo de SoccerHigh se ha portado y metido en el pipeline: ver `docs/highlights/soccerhigh.md`.
 
 ## 4. Referencias clave
 

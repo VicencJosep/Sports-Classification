@@ -3,7 +3,7 @@
 Hecho el 2026-11-02. Modelo del paper *SoccerHigh: A Benchmark Dataset for Automatic Soccer Video Summarization*
 (Díaz-Juan, Ballester, Haro; MMSports 2025, arXiv 2509.01439; repo IPCV/SoccerHigh, CC BY-NC-SA 4.0), reimplementado
 en `analytics/highlights/soccerhigh.py` y metido en el pipeline de highlights como tercera fuente de jugadas junto a
-T-DEED y el audio. Contexto: `docs/estado_arte_highlights.md` §1 y §3 (paso 1), `docs/datasets.md` §2.2.
+T-DEED y el audio. Contexto: `docs/estado_del_arte/highlights.md` §1 y §3 (paso 1), `docs/datasets.md` §2.2.
 
 ## Qué hace el modelo
 
@@ -115,7 +115,7 @@ rescata las filas completas).
 
 1. **Afinar el resumidor con nuestros vídeos** (3 M parámetros, entrena en minutos sobre rasgos cacheados): los 141 de
    train de SoccerHigh con rasgos propios (ya se puede: `extract_features` reproduce los suyos) y, para juveniles, el
-   "resumen de referencia" por partido que pide `docs/estado_arte_highlights.md` §3.5. El ViT-g queda congelado.
+   "resumen de referencia" por partido que pide `docs/estado_del_arte/highlights.md` §3.5. El ViT-g queda congelado.
 2. Medir la selección completa en más partidos de test de SoccerHigh (`scripts/soccerhigh_predictions_from_highlights.py`
    + `--predictions`): el pipeline entero necesita análisis previo (T-DEED, tracking) de cada partido, ~1 h por partido.
 3. Umbral y peso: `soccerhigh_threshold` 0,5 y `w_soccerhigh` 2,5 son los del paper y una primera elección; con la

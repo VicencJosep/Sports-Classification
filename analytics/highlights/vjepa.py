@@ -4,7 +4,7 @@ Ni el VLM ni V-JEPA2 distinguen bien un gol de una parada por separado (AP
 0,27 y 0,19 sobre los 7 EFL, 13 goles, sin rótulo), pero se equivocan en
 jugadas distintas y sumados doblan la AP; con el saque de centro que V-JEPA2
 ve después del gol (clase ``kick-off``) y la ausencia de córner/banda llega
-a ~0,6 (``docs/highlights_evaluacion.md``). Es el camino cuando no hay
+a ~0,6 (``docs/highlights/evaluacion.md``). Es el camino cuando no hay
 marcador legible; el marcador, si existe, manda (``pipeline.goal_decision``).
 
 Las ventanas de 6 s van en una rejilla fija del partido (ventana k =
@@ -146,7 +146,7 @@ def goal_fusion(verdict: dict, f: dict) -> Optional[float]:
     """Votos sumados para "gol" sin marcador: V-JEPA2 (gol en el golpeo,
     saque de centro después, sin córner/banda después), el VLM y el tiro.
     ``None`` si el candidato no pasó por V-JEPA2. Pesos y umbral medidos en
-    los 7 EFL (``docs/highlights_evaluacion.md``)."""
+    los 7 EFL (``docs/highlights/evaluacion.md``)."""
     if "vj_goal" not in f:
         return None
     try:

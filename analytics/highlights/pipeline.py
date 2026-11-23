@@ -115,7 +115,7 @@ def goal_decision(
     (1,0 en paradas repetidas por TV, 0,0 en goles claros); lo que no engaña
     es lo que pasa DESPUÉS: tras un gol hay celebración y saque de centro
     (y griterío en cámara única), tras una parada o un fallo hay córner,
-    saque de puerta o sigue el juego. Medido en docs/highlights_evaluacion.md."""
+    saque de puerta o sigue el juego. Medido en docs/highlights/evaluacion.md."""
     vlm_goal = _vlm_says_goal(verdict)
     # El marcador de la retransmisión manda: cambia justo en el gol y no
     # cambia en una parada, una repetición o un tiro fuera.

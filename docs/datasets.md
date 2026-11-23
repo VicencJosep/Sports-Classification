@@ -13,7 +13,7 @@ está, con la misma numeración, en `docs/datasets_catalogo/` (abrir solo el fic
 | 4A | `docs/datasets_catalogo/4A_usar_ya.md` | Catálogo externo: lo que sirve ya |
 | 4B | `docs/datasets_catalogo/4B_util_en_el_futuro.md` | Catálogo externo: útil más adelante (el más largo, 30 KB) |
 | 4C, 4D | `docs/datasets_catalogo/4C_4D_descartar_y_no_existe.md` | Descartados y nombres que no existen como dataset |
-| 5 | `docs/datasets_catalogo/5_baloncesto.md` | Baloncesto, con el inventario local del antiguo §3.5 |
+| 5 | `docs/archivo/datasets_baloncesto.md` | Baloncesto (archivado: fuera del repo desde el 2026-11-09) |
 | 6 | `docs/datasets_catalogo/6_licencias.md` | Licencias y uso comercial |
 | 8 | `docs/datasets_catalogo/8_huecos.md` | Huecos de la investigación |
 | 9 | `docs/datasets_catalogo/9_fuentes.md` | Fuentes por sección |
@@ -93,7 +93,7 @@ Historia de los backends VLM (`core/events_vllm.py`: VideoARM + Qwen3.5-9B/vLLM 
 
 ### 3.5 Baloncesto
 
-Fuera del repo desde el 2026-11-09 (`/media/dd3/ner-training/basketball_Sports-Classification`). Inventario en `docs/datasets_catalogo/5_baloncesto.md`.
+Fuera del repo desde el 2026-11-09 (`/media/dd3/ner-training/basketball_Sports-Classification`). Inventario en `docs/archivo/datasets_baloncesto.md`.
 
 ### 3.6 Modelos en disco y de qué dataset salen
 

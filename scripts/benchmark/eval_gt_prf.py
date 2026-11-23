@@ -102,9 +102,13 @@ def load_gt(path: Path, span: tuple[float, float] | None) -> tuple[list[dict], t
 
 
 # ----------------------------------------------------------------------------- predicciones
-def load_cache(path: Path) -> SimpleNamespace:
+def load_cache(path: Path, fps_override: float | None = None) -> SimpleNamespace:
     z = np.load(path, allow_pickle=True)
     fps = float(z["fps"]) if "fps" in z.files else 25.0
+    if fps_override:
+        if "fps" in z.files and abs(fps - fps_override) > 0.01:
+            logger.warning("%s: la caché dice %.1f fps y se usa %.1f", path.name, fps, fps_override)
+        fps = fps_override
     out = SimpleNamespace(probs=z["probs"].astype(np.float32), classes=[str(c) for c in z["classes"]],
                           stride=int(z["stride"]), fps=fps, probs_sn=None, classes_sn=None)
     if "probs_sn" in z.files:
@@ -246,6 +250,7 @@ def main() -> None:
     ap.add_argument("--fuse", nargs=2, metavar="MODELO", help="añade la media 0,5/0,5 de estas dos cachés")
     ap.add_argument("--span", type=float, nargs=2, metavar=("INICIO_S", "FIN_S"))
     ap.add_argument("--tol-s", type=float, default=0.5)
+    ap.add_argument("--fps", type=float, help="fps real del vídeo para cachés sin ese campo (Espanyol: 30)")
     ap.add_argument("--fixed", type=float, nargs="*", default=[0.2, 0.3, 0.5], help="umbrales fijos a informar")
     ap.add_argument("--edits", type=Path, help="review/edits.jsonl del visor (reparto por origen de la verdad)")
     ap.add_argument("--title", default="")
@@ -264,7 +269,7 @@ def main() -> None:
     logger.info("verdad %s: %d filas en %.0f-%.0f s; %s", args.gt.name, len(rows), *span,
                 ", ".join(f"{c} {n}" for c, n in sorted(n_gt.items(), key=lambda kv: -kv[1])))
 
-    caches = {m: load_cache(args.video.with_name(f"{args.video.stem}.tdeed.{m}.npz")) for m in args.models}
+    caches = {m: load_cache(args.video.with_name(f"{args.video.stem}.tdeed.{m}.npz"), args.fps) for m in args.models}
     if args.fuse:
         from scripts.benchmark.fuse_scores import fuse
         a, b = (caches[m] for m in args.fuse)

@@ -65,7 +65,7 @@ Notas de investigación de las que procede este documento (2026-11-01): `output/
 
 ### Sección 3 (inventario local)
 
-57. Ficheros del repo citados: `docs/particion_datasets.md`, `docs/hoja_de_ruta.md`, `docs/archivo/estudio_deteccion_tiros.md`, `docs/highlights_evaluacion.md`, `README.md`, `config.py`, `scripts/download_ball_action_data.py`, `scripts/download_soccertrack_v2.sh`, `scripts/ball_detector/*.py`, `scripts/shot_benchmark/*.py`, `scripts/extract_ball_action_clips.py`, `scripts/build_ground_truth.py`, `training/train_ball_actions.py`, `basketball/README.md`, `basketball/datasets/basketball_final/README.md`, `output/ball_experiments/CONCLUSIONES.md`, `datasets/soccertrack-v2/README.md`, `CHANGES_v1_1.md`, `CHANGES_v1_2.md`, `mot/README.md`.
+57. Ficheros del repo citados: `docs/particion_datasets.md`, `docs/hoja_de_ruta.md`, `docs/archivo/estudio_deteccion_tiros.md`, `docs/highlights/evaluacion.md`, `README.md`, `config.py`, `scripts/download_ball_action_data.py`, `scripts/download_soccertrack_v2.sh`, `scripts/ball_detector/*.py`, `scripts/shot_benchmark/*.py`, `scripts/extract_ball_action_clips.py`, `scripts/build_ground_truth.py`, `training/train_ball_actions.py`, `basketball/README.md`, `basketball/datasets/basketball_final/README.md`, `output/ball_experiments/CONCLUSIONES.md`, `datasets/soccertrack-v2/README.md`, `CHANGES_v1_1.md`, `CHANGES_v1_2.md`, `mot/README.md`.
 58. SoccerNet, página de datos y acceso: https://www.soccer-net.org/data
 59. SoccerTrack v2 (HF): https://huggingface.co/datasets/atomscott/soccertrack-v2
 60. SoccerTrack v2, código: https://github.com/AtomScott/SoccerTrack-v2

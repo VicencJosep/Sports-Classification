@@ -1,6 +1,6 @@
 # PAVE (ganador de PCBAS 2026): qué es, si podemos replicarlo y qué trasladar a T-DEED y AdaSpot [2026-11-12]
 
-Valoración sin experimentos (0 GPU). Fuentes: `docs/papers/SoccerNet-2026-results-2607.07320v1.md` §3 y §8.2, el informe
+Valoración sin experimentos (0 GPU). Fuentes: `docs/estado_del_arte/papers/SoccerNet-2026-results-2607.07320v1.md` §3 y §8.2, el informe
 técnico de PAVE ([arXiv 2606.28389](https://arxiv.org/abs/2606.28389), 2 páginas), el paper de FOOTPASS
 ([arXiv 2511.16183](https://arxiv.org/abs/2511.16183)), el repo de los baselines (`JeremieOchin/FOOTPASS`) y nuestras
 medidas de §7.7, §7.12, §7.14 y §7.15 de `docs/comparativa_benchmark.md`. Convenciones: [P] publicado, [M] medido por

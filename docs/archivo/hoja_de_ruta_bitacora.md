@@ -12,7 +12,7 @@
   sin evidencia de que un VLM mayor puntúe jugadas mejor que reglas + marcador. El usuario anota el Espanyol 25:00-30:00
   (`output/annotations/espanyol_damm_Ground_Truth.csv`, formato `tiempo,etiqueta,dorsal(=tracker_id),equipo`). Decisiones del
   usuario: main debe funcionar bien; panorámica sigue en rama; clips 12-30 s con excepciones. Documento creado; resumen del
-  mecanismo de selección añadido a `docs/highlights_evaluacion.md`.
+  mecanismo de selección añadido a `docs/highlights/evaluacion.md`.
 - **2026-10-21** (sesión en `feat/highlights`; el usuario anota el Espanyol en paralelo): carril B, semana 1. (1) Lector del
   CSV (`scripts/annotation_csv.py`), arnés único (`scripts/evaluate_match.py`) y generador de GT reescrito
   (`scripts/build_ground_truth.py`: Labels-ball, Labels-v2 con desfase por mitad, CSV; fps real por `video.json`/ffprobe);
@@ -28,7 +28,7 @@
   8a56011 (duración de clips). Más tarde la GPU se liberó y la cadena §3.6 corrió sola (52 min): `SNB_pano1` ve los 3 goles
   del Mallorca como tiro (> 0,4) pero hunde la EFL (tiros −11 pt, header desaparece, cabeza SN sin "Goal"); `SNB_tv1` queda
   condicionado a mezclar EFL en cada lote y a tener tiros anotados en juveniles (tabla en §3.6).
-- **2026-11-02** (sesión desatendida): **modelo de SoccerHigh portado e integrado** (`docs/highlights_soccerhigh.md`).
+- **2026-11-02** (sesión desatendida): **modelo de SoccerHigh portado e integrado** (`docs/highlights/soccerhigh.md`).
   VideoMAEv2-Giant K710 + resumidor DSNet-AF en torch puro (`analytics/highlights/soccerhigh.py`, `videomaev2.py`); baseline
   reproducido con sus rasgos (45 test: F1 0,412 / F1@T 0,395 frente a 0,396 / 0,388) y con rasgos propios del 720p en 3 de
   test (0,368 / 0,365 frente a 0,353 / 0,346 con los suyos); `video.ini` sustituido por alineación de rasgos
@@ -53,7 +53,7 @@
   Coste: tracker 0,8 → ~32 ms/frame (pipeline ~28 → ~15 fps; `reid="none"` ~20 fps). Pendiente: borrar la caché
   `*.tracks.jsonl` y reanalizar los partidos de TV para ver el efecto en equipo/ejecutor con `evaluate_match.py`; enlace
   offline tipo GTA-Link para las reentradas; licencia de los pesos OSNet antes de producto.
-- **2026-11-08** (estado del arte en tracking): `docs/estado_arte_tracking.md`, con 60+ papers verificados en arXiv por 4 agentes
+- **2026-11-08** (estado del arte en tracking): `docs/estado_del_arte/tracking.md`, con 60+ papers verificados en arXiv por 4 agentes
   (notas en `output/research_notes/tracking_sota_2026-11-08/`). Conclusiones: nuestros 59,4 HOTA están en la banda de
   SoccerMaster+MOTIP (59,1) y YOLOv8+PRTReID (59,8); el hueco hasta SportsSUSHI/Kalisteo (71-76) es detector + enlace a largo plazo
   con dorsal y equipo; la línea BIoU → EIoU (Deep-EIoU, ARC-SORT) es el siguiente escalón online; GTA-Link + dorsal/equipo para las
@@ -105,9 +105,9 @@
   defecto, `--detector hybrid`; pesos en `Soccer_Master/sn-gamestate/pretrained_models`), `scripts/shot_benchmark/` y
   `scripts/ball_detector/` (`tune_tdeed_event_thresholds.py` y el afinado de T-DEED dependen de ellos, y sus lanzadores
   llevan rutas fijas) ni `automation/` (pendiente de que el usuario diga si lo usa).
-- **2026-11-09** (artículos a Markdown, pedido por el usuario). Los tres PDF de `docs/papers/` tienen ahora un `.md`
+- **2026-11-09** (artículos a Markdown, pedido por el usuario). Los tres PDF de `docs/estado_del_arte/papers/` tienen ahora un `.md`
   del mismo nombre: T-DEED (arXiv 2404.05392v2), AdaSpot (2602.22073v1) y SoccerNet 2026 Challenges Results
-  (2607.07320v1); figuras originales en `docs/papers/img/<nombre>/` (20 MB). Se convirtieron desde la versión HTML de
+  (2607.07320v1); figuras originales en `docs/estado_del_arte/papers/img/<nombre>/` (20 MB). Se convirtieron desde la versión HTML de
   arXiv (generada del LaTeX: ecuaciones en LaTeX, tablas completas, secciones en orden) y no desde el PDF, porque la
   extracción directa del PDF rompía ecuaciones y mezclaba las dos columnas. Cotejado con el texto de los PDF: todos los
   números decimales y todos los grupos de citas coinciden. Tres diferencias del HTML corregidas con el PDF: en AdaSpot la
@@ -237,9 +237,92 @@
   (con jugador) hace 60,9 frente a 47,6 de T-DEED y 43,0 de AdaSpot-b (solo clase, umbral óptimo) [M]; gana en banda,
   centro, conducción y tiro, empata en cabezazo, bloqueo y entrada. (4) Replicar: código público sin pesos, pérdida y
   muestreo sin publicar, 1-2 días de GPU por pasada [NV], y en inferencia pediría equipo/dorsal/rol de calidad EPTS que
-  no tenemos (equipo 62-68 % en juveniles): descartado. Escrito `docs/pave_valoracion.md` (§0 resumen, §2 tabla por
+  no tenemos (equipo 62-68 % en juveniles): descartado. Escrito `docs/estado_del_arte/pave_valoracion.md` (§0 resumen, §2 tabla por
   clase, §3 réplica, §4 qué trasladar, §5 tracking, §6 orden); dos filas nuevas en la hoja de ruta §2.1 a 0 GPU
   (fusión por evento con filtro de acuerdo; estado del juego del h5 táctico de FOOTPASS val en `stack_scores.py`) y
   un test de 20-30 min de GPU (352x640 frente a Full HD) antes de decidir la descarga del train. Del tracking: PAVE no
   aporta nada; FOOTPASS val sirve como verdad plateada de equipo, dorsal y homografía en partidos enteros. Enlaces en
   §7.7 y en la tabla de `CLAUDE.md`. Nada lanzado en GPU.
+
+- **2026-11-13 (verdad del Mallorca, T-DEED frente a AdaSpot, reorganización de docs)**: el usuario anotó desde el visor la
+  2.ª parte entera del Mallorca–Barcelona juvenil (`433f62c92b727870`, 47:45-99:35, 115 ediciones: 51 añadidas, 47
+  corregidas, 17 borradas; exportación `review/ground_truth_00m00-99m35.csv`, copia de la 2.ª parte en
+  `output/annotations/mallorca_barcelona_j28_Ground_Truth_2a_parte.csv`) y pidió conclusiones y una tabla T-DEED frente a
+  AdaSpot en esa verdad y en Middlesbrough 0-20 min, en el formato de §7.12 (nº de eventos y P / R). Hecho: (1)
+  `scripts/benchmark/eval_gt_prf.py` (cachés npz → candidatos ≥ 0,01 → NMS suave de T-DEED reimplementado en O(n log n) con
+  salida idéntica, la original cuadrática pasaba de 10 min por modelo → emparejamiento ±0,5 s de `eval_prf` → umbral óptimo
+  global, fijos, ±1 s, «cualquier acción», cabeza SN-v2 para córner/falta/saque y reparto por origen con `edits.jsonl`).
+  (2) `adaspot_scores.py --device cpu --threads N`: la GPU estaba ocupada por dos trabajos del usuario (21 de 24 GB) y
+  AdaSpot-b se puntuó en CPU (partido entero en 5.912 s con 16 hilos; comprobado contra la caché de GPU en 2 min de
+  Middlesbrough: correlación 0,9965). (3) Resultados en `docs/comparativa_benchmark/7.16_spotters_en_verdad_propia.md`:
+  Middlesbrough producción 88 / 87, 200MF 82 / 72, AdaSpot-b 78 / 70, fusión producción + AdaSpot-b 84 / 85 (−3 F1);
+  Mallorca producción 79 / 81 al umbral 0,25 (el automático dio 0,27), pero recall 87 % en las filas que el pipeline ya
+  tenía y 2 % en las 47 añadidas a mano (la verdad nace de sus detecciones); tiros 60 / 30, gol 0 / 3; AdaSpot-b 40 / 3
+  (prob. media de acción 0,005 frente a 0,051 en EFL, mismo colapso que en panorámica); fusión 86 / 70 = T-DEED reescalado
+  (F1 79,9 → 77,3, 0 % de las añadidas); `SNB_pano1` 66 / 68 pero 30 % de las añadidas y 7/10 tiros, cabezazo 0 / 20.
+  Conclusión: la fusión con AdaSpot queda para TV (FOOTPASS); en el producto la palanca es más verdad sin sesgo (equipo en
+  5 min, una parte del Espanyol, un juvenil nuevo como evaluación) y afinar T-DEED con ella. Pendiente: 200MF en el Mallorca
+  (5 min de GPU; `core.ball_spotting` solo CUDA). (4) Docs: `docs/estado_del_arte/` (tracking, highlights, pave_valoracion,
+  `papers/`), `docs/highlights/` (evaluacion, soccerhigh), `docs/archivo/datasets_baloncesto.md`,
+  `docs/archivo/hoja_de_ruta_valoracion_ideas_2026-10-20.md` (§3 íntegro; en la hoja queda una tabla de una línea por idea,
+  41 → 29 KB), borrado `archivo/Propuestas-desarrollo-Highlights.md`; rutas actualizadas en CLAUDE.md, README, docs, código
+  y memoria; `uso/eventos_vjepa2.md` se queda (`core/events.py` lo importan `main.py` y `analytics/highlights/vjepa.py`).
+  `docs/investigacion/` es del reto MTAH 2027 y no se toca. Nada lanzado en GPU.
+
+- **2026-11-14 (Espanyol 1.ª parte, AdaSpot reflotado, por qué se apaga)**: el usuario dudó de que AdaSpot-b cayera a 3 % «de
+  repente» y pidió la causa exacta y una configuración que combine T-DEED, AdaSpot y PAVE; en paralelo anotó la 1.ª parte del
+  Espanyol en el visor (97 ediciones) y pidió fusionarla con su hoja a mano de 25-30 min. Hecho: (1) hoja fusionada
+  `output/annotations/espanyol_damm_Ground_Truth_1a_parte.csv` (897 filas, 18:38-67:32; la hoja a mano manda en 25:13-29:59;
+  diferencias en `...diferencias_25-30.txt`; 22 detecciones del calentamiento y la 2.ª parte fuera); las dos pasadas del
+  anotador discrepan 8 % en etiqueta y 10 % en presencia. (2) `adaspot_scores.py --adapt-bn [--adapt-bn-clips N]` (AdaBN:
+  recalcular las 138 BatchNorm sobre el vídeo sin etiquetas) y `eval_gt_prf.py --fps`. (3) Puntuaciones: AdaSpot-b/-s con y
+  sin AdaBN en el Mallorca entero (CPU y GPU, según estaba libre) y en un clip de la 1.ª parte del Espanyol cortado en keyframe
+  (1115,67 s) y recolocado en la base de tiempo del vídeo; T-DEED 200MF en el Mallorca (GPU, 5 min). Dos reinicios de sesión
+  cortaron cadenas en marcha; lo terminado quedó guardado (escritura atómica) y se relanzó el resto.
+  (4) Resultados en `docs/comparativa_benchmark/7.17_adaspot_reflote_y_espanyol.md`: AdaSpot-b no se apaga por ser amateur
+  sino por el punto de vista (Espanyol, cámara elevada: 60 / 48, 53 % de lo añadido; Mallorca, cámara baja tras cristal y sol,
+  17 % de píxeles verdes en la zona de juego: prob. media 0,005); AdaBN reflota -b (Mallorca 3 → 36 %, Espanyol 48 → 55 %);
+  AdaSpot-s no se apaga (40 / 53 y 54 / 56); 200MF en el Mallorca 59 / 63 pero 32 % de lo añadido y 6/10 tiros; todas las
+  variantes nuevas recogen lo que producción no ve (19-68 % frente a 2-11 %) y disparan poco en lo borrado, pero la media simple
+  con producción hunde la precisión (Espanyol 60 / 79). Conclusión: la combinación tiene que ser aprendida (reabierta la fila
+  de §2.1); SNB_pano1 sigue siendo lo que más recoge de lo que falta (74 % / 30 % de lo añadido, 5/8 y 7/10 tiros) y rompe el
+  cabezazo. Plan de tres etapas (visión T-DEED + rama de recorte de AdaSpot; combinación aprendida; estado del juego al estilo
+  PAVE) escrito en la respuesta y en §7.16 §6 / §7.17 §7. El usuario confirmó que ningún tramo se anotó a ciegas. GPU usada
+  solo cuando estaba libre o con lote 2 compartiendo.
+
+- **2026-11-14** (sesión de 13-14 de noviembre): reto More than a Hack 2027 (Metrica, FC Barcelona, MWC): fase 1 pide H/A/D/X por
+  fotograma del partido BAR-ATH desde tracking automático con el balón ausente el 41 %, métrica spellF1 (posesiones por IoU
+  temporal), línea base 0,24, entrega 17-11. Investigación profunda (6 investigadores, 112 enlaces) en
+  `docs/investigacion/reports/Estado del arte posesión de balón.md`: la semántica es la de Link & Hoernig / Vidal-Codina
+  (último control válido), los modelos sin balón (BallRadar → PathCRF) llegan al 92 % de equipo por fotograma, IDSSE es el
+  único dataset público con la misma verdad, y el decodificador pesa más que imputar el balón. Desarrollo reutilizable:
+  `core/team_possession/` (frames, io_metrica EPTS, io_sportec IDSSE, io_pipeline, features con `feature_matrix` de 89
+  rasgos con contexto ±0,5/1/2 s, control por reglas, decode con Viterbi y duración mínima, simulate, spell_metrics =
+  scorer MIT del reto), `scripts/benchmark/{cache_possession_data,eval_possession,train_possession_model,
+  sweep_possession_decoder}.py`, `scripts/mtah/build_submission.py`, `tests/test_team_possession.py` (9 pruebas),
+  `docs/uso/team_possession.md`. Datos en `datasets/posesion/` (carpeta de root: crear desde el contenedor). Resultados
+  (§7.18, IDSSE con `drop_ball(0.41)` y verdad fusionada < 2 s): línea base del reto 0,255 (calibrada con los 0,243
+  reales), reglas + Viterbi 0,45, HistGradientBoosting + Viterbi 0,56 → 0,59 (rasgos de entorno) → **0,66** con contexto
+  temporal (macro 0,91, vivo/muerto 0,99); en Metrica sample 0,58 frente a 0,43. Oráculos: retraso 1 s −0,21, sin D
+  −0,35. Descartado: Metrica sample como banco (balón ausente = muerto), puente de evidencia en los huecos (sin efecto),
+  reglas sin filtro (fragmentan). Pendiente: datos del reto (inscripción del usuario), Smart Tagging como evidencia,
+  partido nuestro con `teams.json`. Nada en GPU. Rama `exp/mtah-posesion`, sin commitear.
+
+- **2026-11-17**: estado del arte del procesado de cámara previo al análisis. Investigación profunda (6 investigadores:
+  cámara virtual, calibración, mejora de imagen, brecha TV-amateur, sistemas comerciales, balón y región de interés) en
+  `docs/investigacion/reports/Estado del arte procesado de cámara.md`, con las notas en la carpeta del mismo nombre de
+  `docs/investigacion/research_notes/`. Conclusión: ningún trabajo publicado varía el procesado de cámara (cámara
+  virtual, proyección, restauración, estabilización) y mide su efecto en spotting o tracking amateur; lo medido favorece
+  adaptar el modelo con datos del dominio y garantizar la escala en píxeles (ventanas o recortes a resolución nativa), no
+  restaurar la imagen delante de un modelo congelado (superresolución, deblurring, baja luz y estabilización dan
+  ganancias pequeñas o negativas). Cabado et al. 2024 leído entero: la caída a un tercio (E2E-Spot 61,82 → 19,56) sale
+  de un partido (~165 eventos) por dominio de cámara automática, y la cámara única con operador profesional no pierde
+  (70,02). Con respaldo medido: afinar con pocos partidos, pseudoetiquetas (+8,1 mAP con 3 partidos), aumento de escala
+  (82,2 → 92,0 AP en gran angular), redes de balón de varios fotogramas (F1 85-88 frente a 36-45 en ISSIA) y posiciones
+  en el campo como segunda etapa (FOOTPASS F1 35,9 → 67,5, con tracking certificado). Calibración: nada medido en campos
+  amateur y falla de golpe (exige abstención). Comerciales: entregan la vista producida a 1080p; la panorámica está
+  declarada como salida en Pixellot, BePro, AutomaticTV y Spiideo, y en Veo queda sin confirmar. Lagunas que el proyecto
+  puede medir: entrada transformada frente a modelo afinado sobre los mismos partidos; spotter de vídeo sobre recortes
+  de panorámica (recorte plano frente a reproyección); sensibilidad al error de calibración. Avisos: las cifras salen de
+  lecturas resumidas de las páginas (cotejar con el PDF antes de citarlas fuera), Carrillo et al. 2022 no se pudo abrir
+  y el orden de trabajo del informe es inferencia, no resultado publicado. Sin código ni GPU.

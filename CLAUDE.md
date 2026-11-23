@@ -21,16 +21,17 @@ Análisis de partidos de fútbol a partir de vídeo. Resumen del pipeline y de l
 
 | Tarea | Fichero |
 |---|---|
-| Qué toca ahora, decisiones y vías descartadas | `docs/hoja_de_ruta.md` §0, §2 y §4 (38 KB: por secciones) |
+| Qué toca ahora, decisiones y vías descartadas | `docs/hoja_de_ruta.md` §0, §2 y §4 (32 KB: por secciones) |
 | Una cifra de benchmark | tabla de `docs/comparativa_benchmark.md` §7 y luego solo su fichero en `docs/comparativa_benchmark/` |
 | Qué datos hay y con qué se evalúa | `docs/datasets.md` §3 y `docs/particion_datasets.md`; catálogo externo en `docs/datasets_catalogo/` |
 | Usar o tocar un módulo | `docs/uso/<módulo>.md`; valores por defecto en `config.py` |
-| Mejores jugadas | `docs/highlights_evaluacion.md`, `docs/highlights_soccerhigh.md` |
-| Tracking | `docs/estado_arte_tracking.md` y la fila 7.10 de la comparativa |
+| Mejores jugadas | `docs/highlights/evaluacion.md`, `docs/highlights/soccerhigh.md` |
+| Tracking | `docs/estado_del_arte/tracking.md` y la fila 7.10 de la comparativa |
 | Fallos de dependencias o del build | `docs/dependencias_y_problemas.md` |
-| Un artículo (T-DEED, AdaSpot, SoccerNet 2026) | `docs/papers/<nombre>.md` por secciones con `grep` (50-115 KB cada uno); no leas el PDF |
-| Qué trasladar de PAVE (ganador de PCBAS 2026) a nuestros spotters | `docs/pave_valoracion.md` §0 y §6 |
+| Un artículo (T-DEED, AdaSpot, SoccerNet 2026) | `docs/estado_del_arte/papers/<nombre>.md` por secciones con `grep` (50-115 KB cada uno); no leas el PDF |
+| Qué trasladar de PAVE (ganador de PCBAS 2026) a nuestros spotters | `docs/estado_del_arte/pave_valoracion.md` §0 y §6 |
 | API | `backend/README.md` |
+| Posesión de equipo por fotograma y reto MTAH 2027 | `docs/uso/team_possession.md`; cifras en §7.18; estado del arte en `docs/investigacion/reports/` |
 
 ## Al documentar
 

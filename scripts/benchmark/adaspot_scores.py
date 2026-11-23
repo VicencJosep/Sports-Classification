@@ -78,6 +78,32 @@ def _window(start: int, length: int, n: int) -> tuple[slice, slice]:
     return slice(a, b), slice(a - start, b - start)
 
 
+def adapt_bn(model, selector, ds, args) -> None:
+    """Recalcula las estadísticas de todas las BatchNorm (2D del backbone y 3D de los módulos temporales) con una pasada
+    sobre los clips del vídeo en modo entrenamiento, sin gradientes (media acumulada: ``momentum=None``). Dropout en
+    evaluación. Es la adaptación de dominio más barata que existe: si recupera la confianza, el fallo era de estadísticas,
+    no de rasgos."""
+    bns = [m for m in model._model.modules() if isinstance(m, torch.nn.modules.batchnorm._BatchNorm)]
+    for m in bns:
+        m.reset_running_stats()
+        m.momentum = None
+    model._model.train()
+    for m in model._model.modules():
+        if isinstance(m, torch.nn.Dropout):
+            m.eval()
+    t0, n_clips = time.perf_counter(), 0
+    with torch.no_grad():
+        for frames, starts, rois in DataLoader(ds, batch_size=args.batch_size or 4, num_workers=1):
+            selector.new_batch()
+            selector.mode, selector.given = "saliency", None
+            model._model(frames.to(args.device).float(), inference=True)
+            n_clips += len(starts)
+            if args.adapt_bn_clips and n_clips >= args.adapt_bn_clips:
+                break
+    model._model.eval()
+    logger.info("AdaBN: %d BatchNorm recalculadas con %d clips en %.0fs", len(bns), n_clips, time.perf_counter() - t0)
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -91,7 +117,11 @@ def main() -> None:
                     "(anotación a la altura de los pies) y fix (saliencia corregida para contener al ejecutor)")
     ap.add_argument("--batch-size", type=int, help="Clips por lote (por defecto el del config, 4: ~7 GB de VRAM; con 2, ~4 GB)")
     ap.add_argument("--device", default="cuda", choices=["cuda", "cpu"], help="cpu: sin GPU (lento; ver --threads)")
+    ap.add_argument("--adapt-bn", action="store_true",
+                    help="AdaBN: antes de puntuar cada vídeo recalcula las estadísticas de BatchNorm sobre sus propios clips "
+                         "(sin etiquetas ni gradientes; diagnóstico del desplazamiento de dominio). Caché con sufijo _adabn")
     ap.add_argument("--threads", type=int, help="Hilos de torch en CPU (por defecto todos los núcleos)")
+    ap.add_argument("--adapt-bn-clips", type=int, help="AdaBN: usar solo los N primeros clips del vídeo para las estadísticas")
     ap.add_argument("--no-log-saliency", action="store_true",
                     help="No calcula la saliencia en los frames que ya tienen RoI dada (por defecto se guarda para comparar)")
     args = ap.parse_args()
@@ -104,7 +134,7 @@ def main() -> None:
     model, cfg, names, Dataset = load(args.model, args.device)
     selector = model._model.roi_selector = RoIOverride(model._model.roi_selector, log_saliency=not args.no_log_saliency)
     Dataset = with_rois(Dataset)
-    tag = "AdaSpot_" + args.model.split("_")[1]
+    tag = "AdaSpot_" + args.model.split("_")[1] + ("_adabn" if args.adapt_bn else "")
     videos = args.videos or [LABELS_ROOT / g["video"] / "720p.mp4"
                              for g in json.loads((TDEED_SPLITS / f"{args.split}.json").read_text())]
     for video in videos:
@@ -116,6 +146,8 @@ def main() -> None:
         ds = Dataset(str(video), clip_len=cfg.data.clip_len, overlap_len=cfg.data.clip_len // 2, stride=2,
                      dataset="soccernetball", size=(cfg.model.hr_dim[1], cfg.model.hr_dim[0]), modes=todo)
         n = ds._video_len // 2
+        if args.adapt_bn:
+            adapt_bn(model, selector, ds, args)
         acc = {m: np.zeros((n, len(names)), np.float32) for m in todo}
         used = {m: np.zeros((n, 2), np.float32) for m in todo}
         saliency, n_saliency, support = np.zeros((n, 2), np.float32), np.zeros(n, np.int32), np.zeros(n, np.int32)
