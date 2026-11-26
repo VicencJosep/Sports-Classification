@@ -326,3 +326,22 @@
   de panorámica (recorte plano frente a reproyección); sensibilidad al error de calibración. Avisos: las cifras salen de
   lecturas resumidas de las páginas (cotejar con el PDF antes de citarlas fuera), Carrillo et al. 2022 no se pudo abrir
   y el orden de trabajo del informe es inferencia, no resultado publicado. Sin código ni GPU.
+- **2026-11-26 (La Roca: primera verdad a ciegas, y resumen de todos los spotters)**: sesión del 19 al 26 de noviembre.
+  El usuario anotó a ciegas (partido sin analizar en el visor) la 1.ª parte de La Roca–Montmeló, 3.ª Catalana: 457 filas
+  de 3:14 a 53:13, sin centro, fuera, bloqueo ni entrada. La inferencia de los siete spotters (T-DEED producción, 200MF y
+  `SNB_pano1`; AdaSpot-b y -s con y sin AdaBN) se hizo en otro servidor (RTX 4060 Ti) sobre los primeros 56 min, con un
+  paquete preparado aquí; las cachés volvieron a `output/la_roca_inferencia/`. Evaluado aquí sin GPU (§7.19): a umbral
+  fijo 0,25, producción 48 / 40 (F1 44), AdaSpot-s + AdaBN 48 / 46 (47), `SNB_pano1` 35 / 55 (43); la diferencia entre los
+  dos primeros es +3,6 de F1 con intervalo −1,4 a +8,6. En los juveniles anotados desde el visor producción daba 76-80:
+  esa ventaja era en buena parte sesgo de origen. Diagnóstico de producción: el instante coincide (desfase mediano de
+  −0,13 a −0,03 s), la etiqueta es correcta en el 83 % de las emparejadas y el 95 % de las acciones tiene probabilidad
+  ≥ 0,10, pero solo el 65 % llega a 0,20: falla por confianza. El umbral automático cae a su suelo (0,20) porque cuenta
+  como juego los 50 min y 24 son parones. Reservas: tres tramos de juego sin anotar (37:02-37:34, 41:22-42:01 y
+  45:05-46:00) y casi la mitad de los falsos positivos de producción los dispara también otro modelo, así que la
+  precisión es una cota inferior. No se adopta la recomendación del informe del otro servidor de bajar el umbral de tiro
+  a 0,2 (11 tiros, y es vía descartada en §4). Documentado además el resumen de todos los modelos en todos los conjuntos
+  (§7.20), que es una recopilación. Script nuevo: `scripts/benchmark/diag_gt_spotters.py` (intervalos, confianza, falsos
+  positivos, parones). Hablado y sin decidir: usar el silbato del árbitro como señal de estado del juego (prototipo por
+  procesado de señal, sin entrenar), probar producción a 25 fps (a 30 fps el paso 2 da 15 fotogramas/s frente a los 12,5
+  del entrenamiento) y qué papel tienen La Roca (propuesta: evaluación) y Vandalia (propuesta: ajuste) en
+  `docs/particion_datasets.md`, que aún no las recoge. Sin GPU en este servidor.
